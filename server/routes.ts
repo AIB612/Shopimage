@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
-import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
+import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal_service";
 import { handleInstall, handleCallback, getShopSession } from "./shopify";
 
 const scanRequestSchema = z.object({

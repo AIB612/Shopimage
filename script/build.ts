@@ -33,6 +33,9 @@ const allowlist = [
 ];
 
 async function buildAll() {
+  console.log("----------------------------------------");
+  console.log("BUILD SCRIPT RUNNING: ESM MODE (UPDATED)");
+  console.log("----------------------------------------");
   await rm("dist", { recursive: true, force: true });
 
   console.log("building client...");
