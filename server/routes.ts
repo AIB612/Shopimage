@@ -114,7 +114,16 @@ export async function registerRoutes(
           images.push(imageLog);
         }
       } else {
-        images = existingImages;
+        // Reset all images to pending status for fresh scan
+        images = [];
+        for (const img of existingImages) {
+          if (img.status === "optimized") {
+            const resetImg = await storage.updateImageLogStatus(img.id, "pending", null);
+            images.push(resetImg);
+          } else {
+            images.push(img);
+          }
+        }
       }
 
       const heavyImages = images.filter(img => img.originalSize > 500 * 1024);

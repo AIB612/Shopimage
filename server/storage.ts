@@ -8,7 +8,7 @@ export interface IStorage {
   updateShopScanTime(id: string): Promise<void>;
   getImageLogsByShopId(shopId: string): Promise<ImageLog[]>;
   createImageLog(imageLog: InsertImageLog): Promise<ImageLog>;
-  updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number): Promise<ImageLog | undefined>;
+  updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog>;
   getImageLogById(id: string): Promise<ImageLog | undefined>;
 }
 
@@ -39,12 +39,15 @@ export class DatabaseStorage implements IStorage {
   async updateImageLogStatus(
     id: string,
     status: "pending" | "optimized" | "reverted",
-    optimizedSize?: number
-  ): Promise<ImageLog | undefined> {
+    optimizedSize?: number | null
+  ): Promise<ImageLog> {
     const updateData: Partial<ImageLog> = { status };
     if (status === "optimized" && optimizedSize) {
       updateData.optimizedSize = optimizedSize;
       updateData.optimizedAt = new Date();
+    } else if (status === "pending") {
+      updateData.optimizedSize = null;
+      updateData.optimizedAt = null;
     }
     const result = await db.update(imageLogs).set(updateData).where(eq(imageLogs.id, id)).returning();
     return result[0];
