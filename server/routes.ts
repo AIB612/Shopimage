@@ -21,6 +21,88 @@ function extractDomain(url: string): string {
   }
 }
 
+interface ShopifyProductImage {
+  id: number;
+  product_id: number;
+  src: string;
+  width: number;
+  height: number;
+}
+
+interface ShopifyProduct {
+  id: number;
+  title: string;
+  images: ShopifyProductImage[];
+}
+
+async function fetchShopifyProducts(domain: string): Promise<Array<{
+  imageUrl: string;
+  imageName: string;
+  originalSize: number;
+  format: string;
+  shopifyAssetId: string;
+}>> {
+  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  
+  if (!accessToken) {
+    console.log("No SHOPIFY_ACCESS_TOKEN found, using mock data");
+    return generateMockImages(domain);
+  }
+
+  try {
+    const apiUrl = `https://${domain}/admin/api/2024-01/products.json?limit=50`;
+    console.log(`Fetching products from: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        "X-Shopify-Access-Token": accessToken,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Shopify API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error("Error details:", errorText);
+      return generateMockImages(domain);
+    }
+
+    const data = await response.json() as { products: ShopifyProduct[] };
+    const products = data.products || [];
+    
+    console.log(`Found ${products.length} products`);
+
+    const allImages: Array<{
+      imageUrl: string;
+      imageName: string;
+      originalSize: number;
+      format: string;
+      shopifyAssetId: string;
+    }> = [];
+
+    for (const product of products) {
+      for (const image of product.images) {
+        const format = image.src.toLowerCase().includes(".png") ? "PNG" : "JPG";
+        const estimatedSize = (image.width || 800) * (image.height || 800) * (format === "PNG" ? 4 : 3) * 0.15;
+        
+        allImages.push({
+          imageUrl: image.src,
+          imageName: `${product.title.substring(0, 30)}_${image.id}.${format.toLowerCase()}`,
+          originalSize: Math.round(estimatedSize),
+          format,
+          shopifyAssetId: `gid://shopify/ProductImage/${image.id}`,
+        });
+      }
+    }
+
+    console.log(`Found ${allImages.length} total images`);
+    return allImages;
+  } catch (error) {
+    console.error("Error fetching Shopify products:", error);
+    return generateMockImages(domain);
+  }
+}
+
 function generateMockImages(domain: string): Array<{
   imageUrl: string;
   imageName: string;
@@ -94,36 +176,29 @@ export async function registerRoutes(
 
       const existingImages = await storage.getImageLogsByShopId(shop.id);
       
-      let images: ImageLog[];
-      if (existingImages.length === 0) {
-        const mockImages = generateMockImages(domain);
-        images = [];
-        for (const img of mockImages) {
-          const imageLog = await storage.createImageLog({
-            shopId: shop.id,
-            shopifyAssetId: img.shopifyAssetId,
-            imageUrl: img.imageUrl,
-            imageName: img.imageName,
-            originalSize: img.originalSize,
-            optimizedSize: null,
-            format: img.format,
-            status: "pending",
-            originalS3Key: null,
-            optimizedAt: null,
-          });
-          images.push(imageLog);
-        }
-      } else {
-        // Reset all images to pending status for fresh scan
-        images = [];
-        for (const img of existingImages) {
-          if (img.status === "optimized") {
-            const resetImg = await storage.updateImageLogStatus(img.id, "pending", null);
-            images.push(resetImg);
-          } else {
-            images.push(img);
-          }
-        }
+      // Always fetch fresh data from Shopify API
+      const shopifyImages = await fetchShopifyProducts(domain);
+      
+      // Delete existing images and create fresh ones
+      if (existingImages.length > 0) {
+        await storage.deleteImageLogsByShopId(shop.id);
+      }
+      
+      let images: ImageLog[] = [];
+      for (const img of shopifyImages) {
+        const imageLog = await storage.createImageLog({
+          shopId: shop.id,
+          shopifyAssetId: img.shopifyAssetId,
+          imageUrl: img.imageUrl,
+          imageName: img.imageName,
+          originalSize: img.originalSize,
+          optimizedSize: null,
+          format: img.format,
+          status: "pending",
+          originalS3Key: null,
+          optimizedAt: null,
+        });
+        images.push(imageLog);
       }
 
       const heavyImages = images.filter(img => img.originalSize > 500 * 1024);

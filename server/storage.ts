@@ -10,6 +10,7 @@ export interface IStorage {
   createImageLog(imageLog: InsertImageLog): Promise<ImageLog>;
   updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog>;
   getImageLogById(id: string): Promise<ImageLog | undefined>;
+  deleteImageLogsByShopId(shopId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -56,6 +57,10 @@ export class DatabaseStorage implements IStorage {
   async getImageLogById(id: string): Promise<ImageLog | undefined> {
     const result = await db.select().from(imageLogs).where(eq(imageLogs.id, id)).limit(1);
     return result[0];
+  }
+
+  async deleteImageLogsByShopId(shopId: string): Promise<void> {
+    await db.delete(imageLogs).where(eq(imageLogs.shopId, shopId));
   }
 }
 
