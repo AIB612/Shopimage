@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
-import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity } from "lucide-react";
+import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown } from "lucide-react";
 import { ImageResultCard } from "@/components/image-result-card";
 
 interface ShopInfo {
@@ -35,6 +35,9 @@ export default function Home() {
   const [images, setImages] = useState<ImageAnalysis[]>([]);
   const [fixCount, setFixCount] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
+  const [isProUser, setIsProUser] = useState(false);
+  const FREE_IMAGE_LIMIT = 5;
+  const MONTHLY_LIMIT = 500;
   const { toast } = useToast();
 
   // Fetch shop info automatically
@@ -179,10 +182,18 @@ export default function Home() {
   });
 
   const handleFix = (imageId: string) => {
-    if (fixCount >= 3) {
+    if (!isProUser && fixCount >= FREE_IMAGE_LIMIT) {
       toast({
         title: "Free Limit Reached",
-        description: "Upgrade to Pro for unlimited optimizations!",
+        description: "Upgrade to Pro to optimize up to 500 images per month!",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isProUser && fixCount >= MONTHLY_LIMIT) {
+      toast({
+        title: "Monthly Limit Reached",
+        description: "You've reached your 500 image limit this month.",
         variant: "destructive",
       });
       return;
@@ -279,12 +290,12 @@ export default function Home() {
             </div>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {fixCount}/3 free fixes
+            {isProUser ? `${fixCount}/${MONTHLY_LIMIT} this month` : `${Math.min(fixCount, FREE_IMAGE_LIMIT)}/${FREE_IMAGE_LIMIT} free`}
           </Badge>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 overflow-visible">
         {/* Scanning State */}
         {appState === "scanning" && (
           <Card className="p-8 mb-6">
@@ -311,9 +322,9 @@ export default function Home() {
 
         {/* Main Content - Two Column Layout */}
         {(appState === "ready" || appState === "complete") && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Store Info & Speed */}
-            <div className="lg:col-span-1 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Left Column - Store Info & Speed (Sticky) */}
+            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6 lg:self-start">
               {/* Store Card */}
               <Card className="p-6">
                 <div className="flex items-center gap-4 mb-6">
@@ -405,8 +416,8 @@ export default function Home() {
                     )}
                     {optimizedCount > 0 && (
                       <Button 
-                        variant={isSynced ? "secondary" : "outline"}
-                        className="w-full gap-2" 
+                        className="w-full gap-2"
+                        variant={isSynced ? "secondary" : "default"}
                         onClick={handleSync}
                         disabled={syncMutation.isPending || isSynced}
                         data-testid="button-sync"
@@ -484,7 +495,7 @@ export default function Home() {
                       <Gauge className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-performance-score">
+                      <div className="text-3xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-performance-score">
                         {getPerformanceScore()}
                       </div>
                       <p className="text-xs text-muted-foreground">Score</p>
@@ -512,10 +523,18 @@ export default function Home() {
                 <Card className="p-4">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-foreground">Images to Optimize</h3>
-                    <Badge variant="secondary">{images.length} images</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{images.length} images</Badge>
+                      {!isProUser && images.length > FREE_IMAGE_LIMIT && (
+                        <Badge variant="outline" className="text-primary border-primary">
+                          <Lock className="w-3 h-3 mr-1" />
+                          {images.length - FREE_IMAGE_LIMIT} locked
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                    {images.map((image, index) => (
+                    {(isProUser ? images : images.slice(0, FREE_IMAGE_LIMIT)).map((image, index) => (
                       <ImageResultCard
                         key={image.id}
                         image={image}
@@ -524,6 +543,39 @@ export default function Home() {
                         index={index}
                       />
                     ))}
+                    
+                    {/* Unlock More Section */}
+                    {!isProUser && images.length > FREE_IMAGE_LIMIT && (
+                      <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                        <div className="text-center space-y-4">
+                          <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
+                            <Crown className="w-6 h-6 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-foreground">Unlock {images.length - FREE_IMAGE_LIMIT} More Images</h4>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Upgrade to Pro to optimize up to {MONTHLY_LIMIT} images per month
+                            </p>
+                          </div>
+                          <Button 
+                            className="gap-2"
+                            onClick={() => {
+                              toast({
+                                title: "Pro Upgrade",
+                                description: "Pro subscription feature coming soon!",
+                              });
+                            }}
+                            data-testid="button-upgrade"
+                          >
+                            <Crown className="w-4 h-4" />
+                            Upgrade to Pro
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Free: {FREE_IMAGE_LIMIT} images/scan | Pro: {MONTHLY_LIMIT} images/month
+                          </p>
+                        </div>
+                      </Card>
+                    )}
                   </div>
                 </Card>
               )}
