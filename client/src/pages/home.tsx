@@ -464,7 +464,7 @@ export default function Home() {
               </div>
               
               <div className="space-y-3">
-                {images.slice(0, 5).map((image, index) => (
+                {images.map((image, index) => (
                   <ImageResultCard
                     key={image.id}
                     image={image}
@@ -475,16 +475,16 @@ export default function Home() {
                 ))}
               </div>
 
-              {images.length > 5 && (
+              {images.length > 10 && (
                 <Card className="p-4 text-center bg-muted/50">
                   <p className="text-muted-foreground">
-                    +{images.length - 5} more heavy images found.{" "}
+                    Showing {images.length} heavy images.{" "}
                     <button
                       className="text-primary font-medium hover:underline"
                       onClick={() => setShowUpgradeModal(true)}
                       data-testid="button-view-all"
                     >
-                      Upgrade to view all
+                      Upgrade for unlimited scans
                     </button>
                   </p>
                 </Card>
