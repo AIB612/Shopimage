@@ -58,6 +58,7 @@ Two primary tables:
   - PayPal Web SDK v6 for client-side checkout button
   - Environment variables: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`
   - Routes: `/api/paypal/setup`, `/api/paypal/order`, `/api/paypal/order/:orderID/capture`
+  - Freemium model: 5 free images per scan, Pro users get unlimited optimizations
 
 ### Cloud Storage (Planned)
 - **AWS S3**: For backing up original images before optimization (referenced in schema but not yet implemented)

@@ -50,7 +50,6 @@ export default function Home() {
   const [storeUrl, setStoreUrl] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const FREE_IMAGE_LIMIT = 5;
-  const MONTHLY_LIMIT = 500;
   const { toast } = useToast();
 
   // Fetch shop info automatically
@@ -203,14 +202,7 @@ export default function Home() {
       setShowUpgradeModal(true);
       return;
     }
-    if (isProUser && fixCount >= MONTHLY_LIMIT) {
-      toast({
-        title: "Monthly Limit Reached",
-        description: "You've reached your 500 image limit this month.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Pro users have unlimited access
     fixMutation.mutate(imageId);
   };
 
@@ -480,7 +472,7 @@ export default function Home() {
             </div>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {isProUser ? `${fixCount}/${MONTHLY_LIMIT} this month` : `${Math.min(fixCount, FREE_IMAGE_LIMIT)}/${FREE_IMAGE_LIMIT} free`}
+            {isProUser ? `${fixCount} optimized (unlimited)` : `${Math.min(fixCount, FREE_IMAGE_LIMIT)}/${FREE_IMAGE_LIMIT} free`}
           </Badge>
         </div>
       </header>
@@ -744,7 +736,7 @@ export default function Home() {
                           <div>
                             <h4 className="font-semibold text-foreground">Unlock {images.length - FREE_IMAGE_LIMIT} More Images</h4>
                             <p className="text-sm text-muted-foreground mt-1">
-                              Upgrade to Pro to optimize up to {MONTHLY_LIMIT} images per month
+                              Upgrade to Pro for unlimited image optimization
                             </p>
                           </div>
                           <Button 
@@ -756,7 +748,7 @@ export default function Home() {
                             Upgrade to Pro
                           </Button>
                           <p className="text-xs text-muted-foreground">
-                            Free: {FREE_IMAGE_LIMIT} images/scan | Pro: {MONTHLY_LIMIT} images/month
+                            Free: {FREE_IMAGE_LIMIT} images/scan | Pro: Unlimited
                           </p>
                         </div>
                       </Card>

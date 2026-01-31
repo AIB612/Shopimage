@@ -25,7 +25,7 @@ export function UpgradeModal({ open, onClose, onSuccess }: UpgradeModalProps) {
 
   const features = [
     "Unlimited image scans",
-    "Up to 500 optimizations/month",
+    "Unlimited image optimizations",
     "Priority processing",
     "WebP conversion",
     "Shopify sync included",
