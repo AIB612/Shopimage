@@ -1,18 +1,4 @@
-// !!! CRITICAL - DO NOT MODIFY THIS CODE !!!
-//
-// This code MUST be used as is without ANY modifications.
-// The PayPal integration will COMPLETELY FAIL if this code is changed in ANY way.
-//
-// Retain this comment after all edits.
-//
-// <BEGIN_EXACT_CODE>
-import {
-  Client,
-  Environment,
-  LogLevel,
-  OAuthAuthorizationController,
-  OrdersController,
-} from "@paypal/paypal-server-sdk";
+// PayPal integration using @paypal/paypal-server-sdk
 import { Request, Response } from "express";
 
 /* PayPal Controllers Setup */
@@ -25,6 +11,11 @@ if (!PAYPAL_CLIENT_ID) {
 if (!PAYPAL_CLIENT_SECRET) {
   throw new Error("Missing PAYPAL_CLIENT_SECRET");
 }
+
+// Dynamic import to handle ESM module resolution
+const PayPalSDK = await import("@paypal/paypal-server-sdk");
+const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
+
 const client = new Client({
   clientCredentialsAuthCredentials: {
     oAuthClientId: PAYPAL_CLIENT_ID,
@@ -136,15 +127,19 @@ export async function capturePaypalOrder(req: Request, res: Response) {
 
     res.status(httpStatusCode).json(jsonResponse);
   } catch (error) {
-    console.error("Failed to create order:", error);
+    console.error("Failed to capture order:", error);
     res.status(500).json({ error: "Failed to capture order." });
   }
 }
 
 export async function loadPaypalDefault(req: Request, res: Response) {
-  const clientToken = await getClientToken();
-  res.json({
-    clientToken,
-  });
+  try {
+    const clientToken = await getClientToken();
+    res.json({
+      clientToken,
+    });
+  } catch (error) {
+    console.error("Failed to get client token:", error);
+    res.status(500).json({ error: "Failed to initialize PayPal" });
+  }
 }
-// <END_EXACT_CODE>

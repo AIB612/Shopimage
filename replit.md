@@ -52,12 +52,19 @@ Two primary tables:
 - **PostgreSQL**: Primary data store via `DATABASE_URL` environment variable
 - **Drizzle ORM**: Type-safe database queries and schema management
 
+### Payment Integration
+- **PayPal**: Payment processing for Pro subscriptions ($9.99/month) and credit purchases
+  - Uses `@paypal/paypal-server-sdk` for server-side order creation and capture
+  - PayPal Web SDK v6 for client-side checkout button
+  - Environment variables: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`
+  - Routes: `/api/paypal/setup`, `/api/paypal/order`, `/api/paypal/order/:orderID/capture`
+
 ### Cloud Storage (Planned)
 - **AWS S3**: For backing up original images before optimization (referenced in schema but not yet implemented)
 
-### Third-Party Services (Planned based on requirements doc)
-- **Shopify Admin API**: For reading products and theme assets (mock implementation currently)
-- **Image Compression Service**: WebP conversion at 80% quality
+### Third-Party Services
+- **Shopify Admin API**: For reading products and theme assets (uses `SHOPIFY_ACCESS_TOKEN`)
+- **Image Compression Service**: WebP conversion at 80% quality (planned)
 
 ### Frontend Libraries
 - **Radix UI**: Accessible component primitives
