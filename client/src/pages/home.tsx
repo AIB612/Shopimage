@@ -10,6 +10,7 @@ import type { ImageAnalysis, ScanResult } from "@shared/schema";
 import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ImageResultCard } from "@/components/image-result-card";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 interface ShopInfo {
   name: string;
@@ -47,6 +48,7 @@ export default function Home() {
   const [isSynced, setIsSynced] = useState(false);
   const [isProUser, setIsProUser] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const FREE_IMAGE_LIMIT = 5;
   const MONTHLY_LIMIT = 500;
   const { toast } = useToast();
@@ -198,11 +200,7 @@ export default function Home() {
 
   const handleFix = (imageId: string) => {
     if (!isProUser && fixCount >= FREE_IMAGE_LIMIT) {
-      toast({
-        title: "Free Limit Reached",
-        description: "Upgrade to Pro to optimize up to 500 images per month!",
-        variant: "destructive",
-      });
+      setShowUpgradeModal(true);
       return;
     }
     if (isProUser && fixCount >= MONTHLY_LIMIT) {
@@ -751,12 +749,7 @@ export default function Home() {
                           </div>
                           <Button 
                             className="gap-2"
-                            onClick={() => {
-                              toast({
-                                title: "Pro Upgrade",
-                                description: "Pro subscription feature coming soon!",
-                              });
-                            }}
+                            onClick={() => setShowUpgradeModal(true)}
                             data-testid="button-upgrade"
                           >
                             <Crown className="w-4 h-4" />
@@ -789,6 +782,15 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      <UpgradeModal 
+        open={showUpgradeModal} 
+        onClose={() => setShowUpgradeModal(false)}
+        onSuccess={() => {
+          setIsProUser(true);
+          setShowUpgradeModal(false);
+        }}
+      />
     </div>
   );
 }
