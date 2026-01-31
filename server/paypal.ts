@@ -12,36 +12,49 @@ if (!PAYPAL_CLIENT_SECRET) {
   throw new Error("Missing PAYPAL_CLIENT_SECRET");
 }
 
-// Dynamic import to handle ESM module resolution
-const PayPalSDK = await import("@paypal/paypal-server-sdk");
-const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
+let ordersController: any;
+let oAuthAuthorizationController: any;
 
-const client = new Client({
-  clientCredentialsAuthCredentials: {
-    oAuthClientId: PAYPAL_CLIENT_ID,
-    oAuthClientSecret: PAYPAL_CLIENT_SECRET,
-  },
-  timeout: 0,
-  environment:
-                process.env.NODE_ENV === "production"
-                  ? Environment.Production
-                  : Environment.Sandbox,
-  logging: {
-    logLevel: LogLevel.Info,
-    logRequest: {
-      logBody: true,
+// Helper to initialize PayPal SDK dynamically
+async function initPayPal() {
+  if (ordersController && oAuthAuthorizationController) {
+    return;
+  }
+
+  // Dynamic import to handle ESM module resolution
+  const PayPalSDK = await import("@paypal/paypal-server-sdk");
+  const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
+
+  const client = new Client({
+    clientCredentialsAuthCredentials: {
+      oAuthClientId: PAYPAL_CLIENT_ID,
+      oAuthClientSecret: PAYPAL_CLIENT_SECRET,
     },
-    logResponse: {
-      logHeaders: true,
+    timeout: 0,
+    environment:
+      process.env.NODE_ENV === "production"
+        ? Environment.Production
+        : Environment.Sandbox,
+    logging: {
+      logLevel: LogLevel.Info,
+      logRequest: {
+        logBody: true,
+      },
+      logResponse: {
+        logHeaders: true,
+      },
     },
-  },
-});
-const ordersController = new OrdersController(client);
-const oAuthAuthorizationController = new OAuthAuthorizationController(client);
+  });
+
+  ordersController = new OrdersController(client);
+  oAuthAuthorizationController = new OAuthAuthorizationController(client);
+}
 
 /* Token generation helpers */
 
 export async function getClientToken() {
+  await initPayPal();
+  
   const auth = Buffer.from(
     `${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`,
   ).toString("base64");
@@ -60,6 +73,8 @@ export async function getClientToken() {
 
 export async function createPaypalOrder(req: Request, res: Response) {
   try {
+    await initPayPal();
+
     const { amount, currency, intent } = req.body;
 
     if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
@@ -112,6 +127,8 @@ export async function createPaypalOrder(req: Request, res: Response) {
 
 export async function capturePaypalOrder(req: Request, res: Response) {
   try {
+    await initPayPal();
+
     const { orderID } = req.params;
     const orderId = Array.isArray(orderID) ? orderID[0] : orderID;
     const collect = {
@@ -134,6 +151,7 @@ export async function capturePaypalOrder(req: Request, res: Response) {
 
 export async function loadPaypalDefault(req: Request, res: Response) {
   try {
+    // getClientToken calls initPayPal internally
     const clientToken = await getClientToken();
     res.json({
       clientToken,
