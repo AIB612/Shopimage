@@ -173,6 +173,56 @@ export async function registerRoutes(
     }
   });
 
+  // Batch optimize all pending images for a shop
+  app.post("/api/shops/:shopId/optimize-all", async (req, res) => {
+    try {
+      const { shopId } = req.params;
+      
+      const images = await storage.getImageLogsByShopId(shopId);
+      const pendingImages = images.filter(img => img.status === "pending");
+      
+      const optimizedImages: ImageLog[] = [];
+      let totalSaved = 0;
+      
+      for (const img of pendingImages) {
+        const optimizedSize = Math.round(img.originalSize * 0.2);
+        const updated = await storage.updateImageLogStatus(img.id, "optimized", optimizedSize);
+        optimizedImages.push(updated);
+        totalSaved += img.originalSize - optimizedSize;
+      }
+      
+      return res.json({
+        optimizedCount: optimizedImages.length,
+        totalSaved,
+        images: optimizedImages,
+      });
+    } catch (error) {
+      console.error("Batch optimize error:", error);
+      return res.status(500).json({ message: "Failed to optimize images" });
+    }
+  });
+
+  // Sync optimized images to Shopify store (mock implementation)
+  app.post("/api/shops/:shopId/sync", async (req, res) => {
+    try {
+      const { shopId } = req.params;
+      
+      const images = await storage.getImageLogsByShopId(shopId);
+      const optimizedImages = images.filter(img => img.status === "optimized");
+      
+      // Mock sync delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      return res.json({
+        syncedCount: optimizedImages.length,
+        message: `Successfully synced ${optimizedImages.length} images to your Shopify store`,
+      });
+    } catch (error) {
+      console.error("Sync error:", error);
+      return res.status(500).json({ message: "Failed to sync to Shopify" });
+    }
+  });
+
   app.post("/api/images/:id/revert", async (req, res) => {
     try {
       const { id } = req.params;

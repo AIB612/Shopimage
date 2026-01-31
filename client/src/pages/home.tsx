@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
-import { Search, Zap, Loader2, RefreshCw, Sparkles, TrendingDown } from "lucide-react";
+import { Search, Zap, Loader2, RefreshCw, Sparkles, TrendingDown, Upload, Gauge, HardDrive, Clock, CheckCircle2 } from "lucide-react";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { ImageResultCard } from "@/components/image-result-card";
 
@@ -27,7 +27,16 @@ export default function Home() {
   const [images, setImages] = useState<ImageAnalysis[]>([]);
   const [fixCount, setFixCount] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
   const { toast } = useToast();
+
+  // Calculate stats
+  const optimizedCount = images.filter(img => img.status === "optimized").length;
+  const pendingCount = images.filter(img => img.status === "pending").length;
+  const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
+  const totalOptimizedSize = images.reduce((sum, img) => 
+    img.status === "optimized" ? sum + img.estimatedOptimizedSize : sum + img.originalSize, 0);
+  const spaceSaved = totalOriginalSize - totalOptimizedSize;
 
   const scanMutation = useMutation({
     mutationFn: async (url: string) => {
@@ -115,6 +124,51 @@ export default function Home() {
     },
   });
 
+  const optimizeAllMutation = useMutation({
+    mutationFn: async (shopId: string) => {
+      const response = await apiRequest("POST", `/api/shops/${shopId}/optimize-all`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setImages((prev) =>
+        prev.map((img) => ({ ...img, status: "optimized" as const }))
+      );
+      setFixCount((prev) => prev + data.optimizedCount);
+      toast({
+        title: "All Images Optimized",
+        description: `Successfully optimized ${data.optimizedCount} images.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Optimization Failed",
+        description: error.message || "Failed to optimize images.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (shopId: string) => {
+      const response = await apiRequest("POST", `/api/shops/${shopId}/sync`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setIsSynced(true);
+      toast({
+        title: "Sync Complete",
+        description: data.message,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync to Shopify.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleScan = () => {
     if (!storeUrl.trim()) {
       toast({
@@ -141,6 +195,30 @@ export default function Home() {
     setImages([]);
     setStoreUrl("");
     setFixCount(0);
+    setIsSynced(false);
+  };
+
+  const handleOptimizeAll = () => {
+    if (!scanResult?.shop?.id) return;
+    optimizeAllMutation.mutate(scanResult.shop.id);
+  };
+
+  const handleSync = () => {
+    if (!scanResult?.shop?.id) return;
+    syncMutation.mutate(scanResult.shop.id);
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    }
+    return `${(bytes / 1024).toFixed(0)}KB`;
+  };
+
+  const getPerformanceScore = (): number => {
+    if (images.length === 0) return 100;
+    const optimizedRatio = optimizedCount / images.length;
+    return Math.round(40 + optimizedRatio * 60);
   };
 
   const getGradeColor = (grade: string) => {
@@ -260,6 +338,55 @@ export default function Home() {
 
         {scanState === "complete" && scanResult && (
           <div className="space-y-6">
+            {/* Performance Dashboard */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="p-4 bg-card shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <CheckCircle2 className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">{optimizedCount}/{images.length}</div>
+                    <p className="text-xs text-muted-foreground">Images Optimized</p>
+                  </div>
+                </div>
+              </Card>
+              <Card className="p-4 bg-card shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <HardDrive className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatBytes(spaceSaved)}</div>
+                    <p className="text-xs text-muted-foreground">Space Saved</p>
+                  </div>
+                </div>
+              </Card>
+              <Card className="p-4 bg-card shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{potentialTimeSaved.toFixed(1)}s</div>
+                    <p className="text-xs text-muted-foreground">Load Time Saved</p>
+                  </div>
+                </div>
+              </Card>
+              <Card className="p-4 bg-card shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                    <Gauge className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{getPerformanceScore()}</div>
+                    <p className="text-xs text-muted-foreground">Performance Score</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Grade and Actions Card */}
             <Card className="p-6 bg-card shadow-lg">
               <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-6">
@@ -270,30 +397,59 @@ export default function Home() {
                     <p className="text-sm text-muted-foreground mt-1">Grade</p>
                   </div>
                   <div className="h-16 w-px bg-border hidden md:block" />
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="text-center md:text-left">
-                      <div className="text-3xl font-bold text-foreground">
-                        {totalHeavyImages}
-                      </div>
-                      <p className="text-sm text-muted-foreground">Heavy Images</p>
+                  <div className="text-center md:text-left">
+                    <div className="text-lg font-medium text-foreground">
+                      {formatBytes(totalOriginalSize)} total
                     </div>
-                    <div className="text-center md:text-left">
-                      <div className="text-3xl font-bold text-primary">
-                        {potentialTimeSaved.toFixed(1)}s
-                      </div>
-                      <p className="text-sm text-muted-foreground">Time Saved</p>
-                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {optimizedCount > 0 ? `Now ${formatBytes(totalOptimizedSize)}` : "Before optimization"}
+                    </p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  className="gap-2"
-                  data-testid="button-new-scan"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  New Scan
-                </Button>
+                <div className="flex flex-wrap gap-3">
+                  {pendingCount > 0 && (
+                    <Button
+                      onClick={handleOptimizeAll}
+                      disabled={optimizeAllMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-optimize-all"
+                    >
+                      {optimizeAllMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                      Optimize All ({pendingCount})
+                    </Button>
+                  )}
+                  {optimizedCount > 0 && (
+                    <Button
+                      variant={isSynced ? "secondary" : "outline"}
+                      onClick={handleSync}
+                      disabled={syncMutation.isPending || isSynced}
+                      className="gap-2"
+                      data-testid="button-sync"
+                    >
+                      {syncMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : isSynced ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      {isSynced ? "Synced" : "Sync to Shopify"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={handleReset}
+                    className="gap-2"
+                    data-testid="button-new-scan"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    New Scan
+                  </Button>
+                </div>
               </div>
             </Card>
 
