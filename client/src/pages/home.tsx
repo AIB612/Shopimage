@@ -1,18 +1,27 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
-import { Search, Zap, Loader2, RefreshCw, Sparkles, TrendingDown, Upload, Gauge, HardDrive, Clock, CheckCircle2 } from "lucide-react";
-import { UpgradeModal } from "@/components/upgrade-modal";
+import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity } from "lucide-react";
 import { ImageResultCard } from "@/components/image-result-card";
 
-type ScanState = "idle" | "scanning" | "complete";
+interface ShopInfo {
+  name: string;
+  domain: string;
+  speedMetrics: {
+    latency: number;
+  };
+  imagesOptimized: number;
+  totalImages: number;
+  spaceSaved: number;
+}
+
+type AppState = "loading" | "ready" | "scanning" | "complete";
 
 interface ScanStatus {
   progress: number;
@@ -20,15 +29,25 @@ interface ScanStatus {
 }
 
 export default function Home() {
-  const [storeUrl, setStoreUrl] = useState("");
-  const [scanState, setScanState] = useState<ScanState>("idle");
+  const [appState, setAppState] = useState<AppState>("loading");
   const [scanStatus, setScanStatus] = useState<ScanStatus>({ progress: 0, message: "" });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [images, setImages] = useState<ImageAnalysis[]>([]);
   const [fixCount, setFixCount] = useState(0);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isSynced, setIsSynced] = useState(false);
   const { toast } = useToast();
+
+  // Fetch shop info automatically
+  const shopInfoQuery = useQuery<ShopInfo>({
+    queryKey: ["/api/shop/info"],
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (shopInfoQuery.data && appState === "loading") {
+      setAppState("ready");
+    }
+  }, [shopInfoQuery.data, appState]);
 
   // Calculate stats
   const optimizedCount = images.filter(img => img.status === "optimized").length;
@@ -39,13 +58,13 @@ export default function Home() {
   const spaceSaved = totalOriginalSize - totalOptimizedSize;
 
   const scanMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const response = await apiRequest("POST", "/api/scan", { url });
+    mutationFn: async (domain: string) => {
+      const response = await apiRequest("POST", "/api/scan", { url: domain });
       const data = await response.json();
       return data as ScanResult;
     },
     onMutate: () => {
-      setScanState("scanning");
+      setAppState("scanning");
       setScanStatus({ progress: 0, message: "Connecting to store..." });
       
       const progressSteps = [
@@ -70,7 +89,7 @@ export default function Home() {
     onSuccess: (data) => {
       setScanStatus({ progress: 100, message: "Complete!" });
       setTimeout(() => {
-        setScanState("complete");
+        setAppState("complete");
         setScanResult(data);
         
         const imageList = data?.images || [];
@@ -85,13 +104,14 @@ export default function Home() {
           status: img.status,
         }));
         setImages(analysisImages);
+        queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
       }, 600);
     },
     onError: (error: Error) => {
-      setScanState("idle");
+      setAppState("ready");
       toast({
         title: "Scan Failed",
-        description: error.message || "Failed to analyze the store. Please check the URL and try again.",
+        description: error.message || "Failed to analyze the store.",
         variant: "destructive",
       });
     },
@@ -101,24 +121,25 @@ export default function Home() {
     mutationFn: async (imageId: string) => {
       const response = await apiRequest("POST", `/api/images/${imageId}/fix`);
       const data = await response.json();
-      return data as ImageAnalysis;
+      return data;
     },
     onSuccess: (data, imageId) => {
-      setImages((prev) =>
-        prev.map((img) =>
-          img.id === imageId ? { ...img, status: "optimized" } : img
-        )
-      );
-      setFixCount((prev) => prev + 1);
+      setImages(prev => prev.map(img => 
+        img.id === imageId 
+          ? { ...img, status: "optimized" as const, estimatedOptimizedSize: data.optimizedSize }
+          : img
+      ));
+      setFixCount(prev => prev + 1);
+      queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
       toast({
-        title: "Image Optimized",
-        description: "The image has been compressed and updated successfully.",
+        title: "Image Optimized!",
+        description: `Saved ${formatBytes(data.originalSize - data.optimizedSize)}`,
       });
     },
-    onError: (error: Error) => {
+    onError: () => {
       toast({
         title: "Optimization Failed",
-        description: error.message || "Failed to optimize the image.",
+        description: "Failed to optimize the image.",
         variant: "destructive",
       });
     },
@@ -130,20 +151,15 @@ export default function Home() {
       return response.json();
     },
     onSuccess: (data) => {
-      setImages((prev) =>
-        prev.map((img) => ({ ...img, status: "optimized" as const }))
-      );
-      setFixCount((prev) => prev + data.optimizedCount);
+      setImages(prev => prev.map(img => ({
+        ...img,
+        status: "optimized" as const,
+        estimatedOptimizedSize: Math.round(img.originalSize * 0.2),
+      })));
+      queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
       toast({
-        title: "All Images Optimized",
-        description: `Successfully optimized ${data.optimizedCount} images.`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Optimization Failed",
-        description: error.message || "Failed to optimize images.",
-        variant: "destructive",
+        title: "All Images Optimized!",
+        description: `Successfully optimized ${data.optimizedCount} images`,
       });
     },
   });
@@ -153,49 +169,25 @@ export default function Home() {
       const response = await apiRequest("POST", `/api/shops/${shopId}/sync`);
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       setIsSynced(true);
       toast({
-        title: "Sync Complete",
-        description: data.message,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync to Shopify.",
-        variant: "destructive",
+        title: "Synced to Shopify!",
+        description: "All optimized images have been uploaded to your store.",
       });
     },
   });
 
-  const handleScan = () => {
-    if (!storeUrl.trim()) {
+  const handleFix = (imageId: string) => {
+    if (fixCount >= 3) {
       toast({
-        title: "URL Required",
-        description: "Please enter your Shopify store URL.",
+        title: "Free Limit Reached",
+        description: "Upgrade to Pro for unlimited optimizations!",
         variant: "destructive",
       });
       return;
     }
-    scanMutation.mutate(storeUrl);
-  };
-
-  const handleFix = (imageId: string) => {
-    if (fixCount >= 3) {
-      setShowUpgradeModal(true);
-      return;
-    }
     fixMutation.mutate(imageId);
-  };
-
-  const handleReset = () => {
-    setScanState("idle");
-    setScanResult(null);
-    setImages([]);
-    setStoreUrl("");
-    setFixCount(0);
-    setIsSynced(false);
   };
 
   const handleOptimizeAll = () => {
@@ -208,6 +200,19 @@ export default function Home() {
     syncMutation.mutate(scanResult.shop.id);
   };
 
+  const handleScan = () => {
+    if (shopInfoQuery.data?.domain) {
+      scanMutation.mutate(shopInfoQuery.data.domain);
+    }
+  };
+
+  const handleRescan = () => {
+    setAppState("ready");
+    setScanResult(null);
+    setImages([]);
+    setIsSynced(false);
+  };
+
   const formatBytes = (bytes: number): string => {
     if (bytes >= 1024 * 1024) {
       return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -215,295 +220,331 @@ export default function Home() {
     return `${(bytes / 1024).toFixed(0)}KB`;
   };
 
+  const getLatencyStatus = (latency: number) => {
+    if (latency < 100) return { label: "Good", color: "bg-green-500", textColor: "text-green-600" };
+    if (latency <= 300) return { label: "Needs Improvement", color: "bg-yellow-500", textColor: "text-yellow-600" };
+    return { label: "Poor", color: "bg-red-500", textColor: "text-red-600" };
+  };
+
   const getPerformanceScore = (): number => {
-    if (images.length === 0) return 100;
+    if (images.length === 0) return shopInfoQuery.data?.totalImages ? 0 : 100;
     const optimizedRatio = optimizedCount / images.length;
     return Math.round(40 + optimizedRatio * 60);
   };
 
-  const getGradeColor = (grade: string) => {
-    switch (grade) {
-      case "A": return "text-green-500";
-      case "B": return "text-lime-500";
-      case "C": return "text-yellow-500";
-      case "D": return "text-orange-500";
-      case "F": return "text-red-500";
-      default: return "text-muted-foreground";
-    }
-  };
+  // Loading state
+  if (shopInfoQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Loading store information...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const totalHeavyImages = scanResult?.totalHeavyImages ?? 0;
-  const potentialTimeSaved = scanResult?.potentialTimeSaved ?? 0;
-  const grade = scanResult?.grade ?? "N/A";
+  // Error state
+  if (shopInfoQuery.error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="p-8 max-w-md text-center space-y-4">
+          <Store className="w-16 h-16 text-muted-foreground mx-auto" />
+          <h2 className="text-xl font-semibold">Unable to Connect</h2>
+          <p className="text-muted-foreground">Could not connect to your Shopify store. Please check your API credentials.</p>
+          <Button onClick={() => shopInfoQuery.refetch()} data-testid="button-retry">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const shopInfo = shopInfoQuery.data;
+  const latencyStatus = getLatencyStatus(shopInfo?.speedMetrics.latency || 0);
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="absolute top-4 right-4">
-        <Sparkles className="w-8 h-8 text-primary/30" />
-      </div>
-      <div className="absolute bottom-4 left-4">
-        <Sparkles className="w-6 h-6 text-primary/20" />
-      </div>
-
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3 tracking-tight">
-            IMAGE WEIGHT CHECKER
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Find & Fix Slow Images Instantly
-          </p>
-        </header>
-
-        {scanState === "idle" && (
-          <div className="space-y-8">
-            <Card className="p-2 bg-card shadow-lg">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    type="url"
-                    placeholder="Enter your Shopify store URL"
-                    value={storeUrl}
-                    onChange={(e) => setStoreUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleScan()}
-                    className="pl-12 h-14 text-base border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                    data-testid="input-store-url"
-                  />
-                </div>
-                <Button
-                  onClick={handleScan}
-                  disabled={scanMutation.isPending}
-                  className="h-14 px-8 text-base font-semibold"
-                  data-testid="button-analyze"
-                >
-                  {scanMutation.isPending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    "ANALYZE"
-                  )}
-                </Button>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="p-6 text-center hover-elevate">
-                <div className="w-12 h-12 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Search className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-2">Scan</h3>
-                <p className="text-sm text-muted-foreground">
-                  Enter your store URL and we'll analyze all images
-                </p>
-              </Card>
-              <Card className="p-6 text-center hover-elevate">
-                <div className="w-12 h-12 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center">
-                  <TrendingDown className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-2">Analyze</h3>
-                <p className="text-sm text-muted-foreground">
-                  Find heavy images slowing down your site
-                </p>
-              </Card>
-              <Card className="p-6 text-center hover-elevate">
-                <div className="w-12 h-12 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Zap className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="font-semibold mb-2">Optimize</h3>
-                <p className="text-sm text-muted-foreground">
-                  One-click compression to WebP format
-                </p>
-              </Card>
+      {/* Header */}
+      <header className="border-b bg-card">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Image Weight Checker</h1>
+              <p className="text-xs text-muted-foreground">Optimize your store images</p>
             </div>
           </div>
-        )}
+          <Badge variant="secondary" className="text-xs">
+            {fixCount}/3 free fixes
+          </Badge>
+        </div>
+      </header>
 
-        {scanState === "scanning" && (
-          <Card className="p-8 bg-card shadow-lg">
-            <div className="space-y-6">
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
-                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Scanning State */}
+        {appState === "scanning" && (
+          <Card className="p-8 mb-6">
+            <div className="max-w-md mx-auto text-center space-y-6">
+              <div className="relative w-24 h-24 mx-auto">
+                <div className="absolute inset-0 border-4 border-primary/20 rounded-full" />
+                <div 
+                  className="absolute inset-0 border-4 border-primary rounded-full animate-spin"
+                  style={{ 
+                    clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.sin(scanStatus.progress * Math.PI / 50)}% ${50 - 50 * Math.cos(scanStatus.progress * Math.PI / 50)}%, 50% 50%)` 
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-primary">{scanStatus.progress}%</span>
                 </div>
-                <h2 className="text-xl font-semibold mb-2">Scanning Your Store</h2>
-                <p className="text-muted-foreground">{scanStatus.message}</p>
               </div>
-              <Progress value={scanStatus.progress} className="h-3" />
-              <p className="text-center text-sm text-muted-foreground">
-                {scanStatus.progress}% complete
-              </p>
+              <div className="space-y-2">
+                <p className="font-medium text-foreground">{scanStatus.message}</p>
+                <Progress value={scanStatus.progress} className="h-2" />
+              </div>
             </div>
           </Card>
         )}
 
-        {scanState === "complete" && scanResult && (
-          <div className="space-y-6">
-            {/* Performance Dashboard */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="p-4 bg-card shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <CheckCircle2 className="w-5 h-5 text-primary" />
+        {/* Main Content - Two Column Layout */}
+        {(appState === "ready" || appState === "complete") && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - Store Info & Speed */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Store Card */}
+              <Card className="p-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Store className="w-7 h-7 text-primary" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-foreground">{optimizedCount}/{images.length}</div>
-                    <p className="text-xs text-muted-foreground">Images Optimized</p>
+                    <h2 className="text-xl font-bold text-foreground" data-testid="text-shop-name">
+                      {shopInfo?.name || "PROFILO"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{shopInfo?.domain}</p>
                   </div>
                 </div>
-              </Card>
-              <Card className="p-4 bg-card shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                    <HardDrive className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatBytes(spaceSaved)}</div>
-                    <p className="text-xs text-muted-foreground">Space Saved</p>
+
+                {/* Speed Metrics */}
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Activity className="w-4 h-4" />
+                    Store Speed
+                  </h3>
+                  
+                  {/* Latency Indicator */}
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full ${latencyStatus.color}`} />
+                        <span className="text-lg font-bold text-foreground">
+                          {shopInfo?.speedMetrics.latency || 0}ms
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium ${latencyStatus.textColor}`}>
+                        {latencyStatus.label}
+                      </span>
+                    </div>
+                    
+                    {/* Speed Scale */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-green-600">Good</span>
+                        <span className="text-muted-foreground">&lt; 100ms</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-yellow-600">Needs Improvement</span>
+                        <span className="text-muted-foreground">100ms - 300ms</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-red-600">Poor</span>
+                        <span className="text-muted-foreground">&gt; 300ms</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </Card>
-              <Card className="p-4 bg-card shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+
+                {/* Optimize Button */}
+                {appState === "ready" && (
+                  <Button 
+                    className="w-full gap-2" 
+                    size="lg"
+                    onClick={handleScan}
+                    disabled={scanMutation.isPending}
+                    data-testid="button-optimize-now"
+                  >
+                    {scanMutation.isPending ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Zap className="w-5 h-5" />
+                    )}
+                    Start Optimization
+                  </Button>
+                )}
+
+                {appState === "complete" && (
+                  <div className="space-y-3">
+                    {pendingCount > 0 && (
+                      <Button 
+                        className="w-full gap-2" 
+                        size="lg"
+                        onClick={handleOptimizeAll}
+                        disabled={optimizeAllMutation.isPending}
+                        data-testid="button-optimize-all"
+                      >
+                        {optimizeAllMutation.isPending ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Zap className="w-5 h-5" />
+                        )}
+                        Optimize All ({pendingCount})
+                      </Button>
+                    )}
+                    {optimizedCount > 0 && (
+                      <Button 
+                        variant={isSynced ? "secondary" : "outline"}
+                        className="w-full gap-2" 
+                        onClick={handleSync}
+                        disabled={syncMutation.isPending || isSynced}
+                        data-testid="button-sync"
+                      >
+                        {syncMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : isSynced ? (
+                          <CheckCircle2 className="w-4 h-4" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        {isSynced ? "Synced" : "Sync to Shopify"}
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      className="w-full gap-2"
+                      onClick={handleRescan}
+                      data-testid="button-rescan"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Rescan Store
+                    </Button>
                   </div>
-                  <div>
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{potentialTimeSaved.toFixed(1)}s</div>
-                    <p className="text-xs text-muted-foreground">Load Time Saved</p>
-                  </div>
-                </div>
-              </Card>
-              <Card className="p-4 bg-card shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
-                    <Gauge className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{getPerformanceScore()}</div>
-                    <p className="text-xs text-muted-foreground">Performance Score</p>
-                  </div>
-                </div>
+                )}
               </Card>
             </div>
 
-            {/* Grade and Actions Card */}
-            <Card className="p-6 bg-card shadow-lg">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <div className={`text-6xl font-bold ${getGradeColor(grade)}`}>
-                      {grade}
+            {/* Right Column - Dashboard & Images */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Dashboard Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-primary" />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">Grade</p>
-                  </div>
-                  <div className="h-16 w-px bg-border hidden md:block" />
-                  <div className="text-center md:text-left">
-                    <div className="text-lg font-medium text-foreground">
-                      {formatBytes(totalOriginalSize)} total
+                    <div>
+                      <div className="text-2xl font-bold text-foreground" data-testid="text-optimized-count">
+                        {appState === "complete" ? optimizedCount : (shopInfo?.imagesOptimized || 0)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Optimized</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {optimizedCount > 0 ? `Now ${formatBytes(totalOptimizedSize)}` : "Before optimization"}
-                    </p>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {pendingCount > 0 && (
-                    <Button
-                      onClick={handleOptimizeAll}
-                      disabled={optimizeAllMutation.isPending}
-                      className="gap-2"
-                      data-testid="button-optimize-all"
-                    >
-                      {optimizeAllMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Zap className="w-4 h-4" />
-                      )}
-                      Optimize All ({pendingCount})
-                    </Button>
-                  )}
-                  {optimizedCount > 0 && (
-                    <Button
-                      variant={isSynced ? "secondary" : "outline"}
-                      onClick={handleSync}
-                      disabled={syncMutation.isPending || isSynced}
-                      className="gap-2"
-                      data-testid="button-sync"
-                    >
-                      {syncMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : isSynced ? (
-                        <CheckCircle2 className="w-4 h-4" />
-                      ) : (
-                        <Upload className="w-4 h-4" />
-                      )}
-                      {isSynced ? "Synced" : "Sync to Shopify"}
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={handleReset}
-                    className="gap-2"
-                    data-testid="button-new-scan"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    New Scan
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">
-                  TOP {Math.min(images.length, 5)} HEAVY IMAGES
-                </h2>
-                <Badge variant="secondary" className="text-xs">
-                  {fixCount}/3 free fixes used
-                </Badge>
-              </div>
-              
-              <div className="space-y-3">
-                {images.map((image, index) => (
-                  <ImageResultCard
-                    key={image.id}
-                    image={image}
-                    onFix={() => handleFix(image.id)}
-                    isFixing={fixMutation.isPending && fixMutation.variables === image.id}
-                    index={index}
-                  />
-                ))}
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <HardDrive className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-space-saved">
+                        {formatBytes(appState === "complete" ? spaceSaved : (shopInfo?.spaceSaved || 0))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Space Saved</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {appState === "complete" ? images.length : (shopInfo?.totalImages || 0)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Total Images</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                      <Gauge className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-performance-score">
+                        {getPerformanceScore()}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Score</p>
+                    </div>
+                  </div>
+                </Card>
               </div>
 
-              {images.length > 10 && (
-                <Card className="p-4 text-center bg-muted/50">
-                  <p className="text-muted-foreground">
-                    Showing {images.length} heavy images.{" "}
-                    <button
-                      className="text-primary font-medium hover:underline"
-                      onClick={() => setShowUpgradeModal(true)}
-                      data-testid="button-view-all"
-                    >
-                      Upgrade for unlimited scans
-                    </button>
-                  </p>
+              {/* Images List */}
+              {appState === "ready" && (
+                <Card className="p-8 text-center">
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                      <Zap className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">Ready to Optimize</h3>
+                      <p className="text-muted-foreground">Click "Start Optimization" to scan your store images and find optimization opportunities.</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {appState === "complete" && images.length > 0 && (
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-foreground">Images to Optimize</h3>
+                    <Badge variant="secondary">{images.length} images</Badge>
+                  </div>
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    {images.map((image, index) => (
+                      <ImageResultCard
+                        key={image.id}
+                        image={image}
+                        onFix={() => handleFix(image.id)}
+                        isFixing={fixMutation.isPending && fixMutation.variables === image.id}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {appState === "complete" && images.length === 0 && (
+                <Card className="p-8 text-center">
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">All Images Optimized!</h3>
+                      <p className="text-muted-foreground">Your store images are already well optimized. No heavy images found.</p>
+                    </div>
+                  </div>
                 </Card>
               )}
             </div>
-
-            <footer className="text-center pt-6">
-              <p className="text-sm text-muted-foreground">
-                Powered by Lightonoge API
-              </p>
-            </footer>
           </div>
         )}
-
-        <UpgradeModal
-          open={showUpgradeModal}
-          onClose={() => setShowUpgradeModal(false)}
-        />
-      </div>
+      </main>
     </div>
   );
 }

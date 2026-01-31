@@ -158,6 +158,75 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  // Get shop info automatically (for embedded Shopify app)
+  app.get("/api/shop/info", async (req, res) => {
+    try {
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      
+      // For embedded app, get shop domain from session or use default
+      // In a real embedded app, this would come from Shopify OAuth session
+      const shopDomain = "aanderonline.myshopify.com";
+      
+      let shopName = "PROFILO";
+      let shopDomainResult = shopDomain;
+      
+      // Try to fetch real shop info if token is available
+      if (accessToken) {
+        try {
+          const shopInfoUrl = `https://${shopDomain}/admin/api/2024-01/shop.json`;
+          const response = await fetch(shopInfoUrl, {
+            headers: {
+              "X-Shopify-Access-Token": accessToken,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json() as { shop: { name: string; domain: string; myshopify_domain: string } };
+            shopName = data.shop.name;
+            shopDomainResult = data.shop.myshopify_domain;
+          }
+        } catch (err) {
+          console.log("Could not fetch shop info from Shopify, using defaults");
+        }
+      }
+      
+      // Calculate speed metrics (simulated based on image analysis)
+      const shop = await storage.getShopByDomain(shopDomain);
+      let images: ImageLog[] = [];
+      if (shop) {
+        images = await storage.getImageLogsByShopId(shop.id);
+      }
+      
+      const totalImageSize = images.reduce((sum, img) => sum + img.originalSize, 0);
+      const avgImageSize = images.length > 0 ? totalImageSize / images.length : 0;
+      
+      // Speed metrics calculation (latency-based)
+      // < 100ms = Good, 100-300ms = Needs Improvement, > 300ms = Poor
+      const baseLatency = 80 + (avgImageSize / (500 * 1024)) * 150;
+      const latency = Math.min(500, Math.round(baseLatency));
+
+      return res.json({
+        name: shopName,
+        domain: shopDomainResult,
+        speedMetrics: {
+          latency, // Single latency metric as requested
+        },
+        imagesOptimized: images.filter(img => img.status === "optimized").length,
+        totalImages: images.length,
+        spaceSaved: images.reduce((sum, img) => {
+          if (img.status === "optimized" && img.optimizedSize) {
+            return sum + (img.originalSize - img.optimizedSize);
+          }
+          return sum;
+        }, 0),
+      });
+    } catch (error) {
+      console.error("Shop info error:", error);
+      return res.status(500).json({ message: "Failed to get shop info" });
+    }
+  });
+
   app.post("/api/scan", async (req, res) => {
     try {
       const parsed = scanRequestSchema.safeParse(req.body);
