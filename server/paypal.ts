@@ -6,10 +6,10 @@ import { Request, Response } from "express";
 const { PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET } = process.env;
 
 if (!PAYPAL_CLIENT_ID) {
-  throw new Error("Missing PAYPAL_CLIENT_ID");
+  console.warn("Missing PAYPAL_CLIENT_ID environment variable");
 }
 if (!PAYPAL_CLIENT_SECRET) {
-  throw new Error("Missing PAYPAL_CLIENT_SECRET");
+  console.warn("Missing PAYPAL_CLIENT_SECRET environment variable");
 }
 
 let ordersController: any;
@@ -20,18 +20,20 @@ async function initPayPal() {
   if (ordersController && oAuthAuthorizationController) {
     return;
   }
-
-  // Use Promise-based dynamic import instead of await to strictly avoid ANY ambiguity
-  // with top-level await parsers, although async/await inside function IS valid.
-  // This is the safest, most compatible way to do dynamic imports in tricky build environments.
   
-  const PayPalSDK = await import("@paypal/paypal-server-sdk");
+  // Use require here via createRequire banner in build process
+  // This bypasses esbuild's ESM parsing of `import()` which seems to trigger the top-level await check incorrectly
+  // or is just safer for this specific package in this specific build setup.
+  const { createRequire } = await import("module");
+  const require = createRequire(import.meta.url);
+  
+  const PayPalSDK = require("@paypal/paypal-server-sdk");
   const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
 
   const client = new Client({
     clientCredentialsAuthCredentials: {
-      oAuthClientId: PAYPAL_CLIENT_ID,
-      oAuthClientSecret: PAYPAL_CLIENT_SECRET,
+      oAuthClientId: PAYPAL_CLIENT_ID || "",
+      oAuthClientSecret: PAYPAL_CLIENT_SECRET || "",
     },
     timeout: 0,
     environment:
