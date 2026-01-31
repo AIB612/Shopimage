@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
+import { handleInstall, handleCallback, getShopSession } from "./shopify";
 
 const scanRequestSchema = z.object({
   url: z.string().url().or(z.string().min(1)),
@@ -416,6 +417,19 @@ export async function registerRoutes(
 
   app.post("/api/paypal/order/:orderID/capture", async (req, res) => {
     await capturePaypalOrder(req, res);
+  });
+
+  // Shopify OAuth routes
+  app.get("/api/shopify/install", async (req, res) => {
+    await handleInstall(req, res);
+  });
+
+  app.get("/api/shopify/callback", async (req, res) => {
+    await handleCallback(req, res);
+  });
+
+  app.get("/api/shopify/session", async (req, res) => {
+    await getShopSession(req, res);
   });
 
   return httpServer;

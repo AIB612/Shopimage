@@ -8,6 +8,9 @@ export const imageStatusEnum = pgEnum("image_status", ["pending", "optimized", "
 export const shops = pgTable("shops", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   domain: text("domain").notNull().unique(),
+  accessToken: text("access_token"),
+  scope: text("scope"),
+  isPro: integer("is_pro").default(0),
   lastScanAt: timestamp("last_scan_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

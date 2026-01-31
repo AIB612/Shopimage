@@ -6,6 +6,8 @@ export interface IStorage {
   getShopByDomain(domain: string): Promise<Shop | undefined>;
   createShop(shop: InsertShop): Promise<Shop>;
   updateShopScanTime(id: string): Promise<void>;
+  updateShopToken(id: string, accessToken: string, scope: string): Promise<void>;
+  updateShopProStatus(id: string, isPro: boolean): Promise<void>;
   getImageLogsByShopId(shopId: string): Promise<ImageLog[]>;
   createImageLog(imageLog: InsertImageLog): Promise<ImageLog>;
   updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog>;
@@ -26,6 +28,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateShopScanTime(id: string): Promise<void> {
     await db.update(shops).set({ lastScanAt: new Date() }).where(eq(shops.id, id));
+  }
+
+  async updateShopToken(id: string, accessToken: string, scope: string): Promise<void> {
+    await db.update(shops).set({ accessToken, scope }).where(eq(shops.id, id));
+  }
+
+  async updateShopProStatus(id: string, isPro: boolean): Promise<void> {
+    await db.update(shops).set({ isPro: isPro ? 1 : 0 }).where(eq(shops.id, id));
   }
 
   async getImageLogsByShopId(shopId: string): Promise<ImageLog[]> {
