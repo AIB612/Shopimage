@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
 
 const scanRequestSchema = z.object({
   url: z.string().url().or(z.string().min(1)),
@@ -405,104 +405,17 @@ export async function registerRoutes(
     }
   });
 
-  // Get Stripe publishable key for frontend
-  app.get("/api/stripe/config", async (req, res) => {
-    try {
-      const publishableKey = await getStripePublishableKey();
-      return res.json({ publishableKey });
-    } catch (error) {
-      console.error("Stripe config error:", error);
-      return res.status(500).json({ message: "Failed to get Stripe config" });
-    }
+  // PayPal integration routes
+  app.get("/api/paypal/setup", async (req, res) => {
+    await loadPaypalDefault(req, res);
   });
 
-  // Create checkout session for Pro subscription
-  app.post("/api/stripe/checkout", async (req, res) => {
-    try {
-      const stripe = await getUncachableStripeClient();
-      const { email } = req.body;
-      
-      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-      
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: 'Image Optimizer Pro',
-                description: 'Unlimited image optimization - up to 500 images per month',
-              },
-              unit_amount: 999,
-              recurring: {
-                interval: 'month',
-              },
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'subscription',
-        success_url: `${baseUrl}?success=true`,
-        cancel_url: `${baseUrl}?canceled=true`,
-        customer_email: email,
-        metadata: {
-          plan: 'pro',
-        },
-      });
-
-      return res.json({ url: session.url, sessionId: session.id });
-    } catch (error) {
-      console.error("Checkout error:", error);
-      return res.status(500).json({ message: "Failed to create checkout session" });
-    }
+  app.post("/api/paypal/order", async (req, res) => {
+    await createPaypalOrder(req, res);
   });
 
-  // Create one-time payment for credits
-  app.post("/api/stripe/buy-credits", async (req, res) => {
-    try {
-      const stripe = await getUncachableStripeClient();
-      const { email, credits } = req.body;
-      
-      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-      
-      const creditPackages: Record<number, { price: number; name: string }> = {
-        50: { price: 499, name: '50 Image Credits' },
-        100: { price: 899, name: '100 Image Credits' },
-        500: { price: 2999, name: '500 Image Credits' },
-      };
-      
-      const pkg = creditPackages[credits] || creditPackages[50];
-      
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: pkg.name,
-                description: `${credits} image optimization credits`,
-              },
-              unit_amount: pkg.price,
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'payment',
-        success_url: `${baseUrl}?success=true&credits=${credits}`,
-        cancel_url: `${baseUrl}?canceled=true`,
-        customer_email: email,
-        metadata: {
-          credits: credits.toString(),
-        },
-      });
-
-      return res.json({ url: session.url, sessionId: session.id });
-    } catch (error) {
-      console.error("Buy credits error:", error);
-      return res.status(500).json({ message: "Failed to create checkout session" });
-    }
+  app.post("/api/paypal/order/:orderID/capture", async (req, res) => {
+    await capturePaypalOrder(req, res);
   });
 
   return httpServer;

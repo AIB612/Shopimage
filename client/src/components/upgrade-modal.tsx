@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -9,10 +8,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Check, Zap, Crown, Sparkles, CreditCard, Loader2 } from "lucide-react";
+import { Check, Zap, Crown, CreditCard } from "lucide-react";
+import PayPalButton from "./PayPalButton";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -21,49 +19,9 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ open, onClose, onSuccess }: UpgradeModalProps) {
-  const [email, setEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<"pro" | "credits">("pro");
   const [selectedCredits, setSelectedCredits] = useState(100);
   const { toast } = useToast();
-
-  const checkoutMutation = useMutation({
-    mutationFn: async () => {
-      if (selectedPlan === "pro") {
-        const response = await apiRequest("POST", "/api/stripe/checkout", { email });
-        return response.json();
-      } else {
-        const response = await apiRequest("POST", "/api/stripe/buy-credits", { 
-          email, 
-          credits: selectedCredits 
-        });
-        return response.json();
-      }
-    },
-    onSuccess: (data) => {
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Payment Error",
-        description: error.message || "Failed to start checkout",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCheckout = () => {
-    if (!email.trim()) {
-      toast({
-        title: "Email Required",
-        description: "Please enter your email address",
-        variant: "destructive",
-      });
-      return;
-    }
-    checkoutMutation.mutate();
-  };
 
   const features = [
     "Unlimited image scans",
@@ -75,10 +33,39 @@ export function UpgradeModal({ open, onClose, onSuccess }: UpgradeModalProps) {
   ];
 
   const creditPackages = [
-    { credits: 50, price: "$4.99", perImage: "$0.10" },
-    { credits: 100, price: "$8.99", perImage: "$0.09" },
-    { credits: 500, price: "$29.99", perImage: "$0.06" },
+    { credits: 50, price: "4.99", perImage: "$0.10" },
+    { credits: 100, price: "8.99", perImage: "$0.09" },
+    { credits: 500, price: "29.99", perImage: "$0.06" },
   ];
+
+  const getAmount = () => {
+    if (selectedPlan === "pro") {
+      return "9.99";
+    }
+    const pkg = creditPackages.find(p => p.credits === selectedCredits);
+    return pkg?.price || "8.99";
+  };
+
+  const handlePaymentSuccess = (data: any) => {
+    toast({
+      title: "Payment Successful!",
+      description: selectedPlan === "pro" 
+        ? "Welcome to Pro! You now have unlimited optimization." 
+        : `${selectedCredits} credits have been added to your account.`,
+    });
+    if (onSuccess) {
+      onSuccess();
+    }
+    onClose();
+  };
+
+  const handlePaymentError = (error: any) => {
+    toast({
+      title: "Payment Failed",
+      description: "There was an issue processing your payment. Please try again.",
+      variant: "destructive",
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -168,7 +155,7 @@ export function UpgradeModal({ open, onClose, onSuccess }: UpgradeModalProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="text-lg font-bold">{pkg.price}</div>
+                  <div className="text-lg font-bold">${pkg.price}</div>
                 </div>
               </Card>
             ))}
@@ -176,38 +163,23 @@ export function UpgradeModal({ open, onClose, onSuccess }: UpgradeModalProps) {
         )}
 
         <div className="space-y-4 mt-4">
-          <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              Email Address
-            </label>
-            <Input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              data-testid="input-checkout-email"
+          <div className="flex flex-col items-center justify-center py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              {selectedPlan === "pro" 
+                ? "Subscribe for $9.99/month" 
+                : `Buy ${selectedCredits} credits for $${getAmount()}`}
+            </p>
+            <PayPalButton 
+              amount={getAmount()}
+              currency="USD"
+              intent="CAPTURE"
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
             />
           </div>
 
-          <Button 
-            className="w-full gap-2" 
-            size="lg"
-            onClick={handleCheckout}
-            disabled={checkoutMutation.isPending}
-            data-testid="button-checkout"
-          >
-            {checkoutMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            {selectedPlan === "pro" 
-              ? "Subscribe - $9.99/month" 
-              : `Buy ${selectedCredits} Credits`}
-          </Button>
-
           <p className="text-center text-xs text-muted-foreground">
-            Secure payment powered by Stripe. Cancel anytime.
+            Secure payment powered by PayPal.
           </p>
         </div>
       </DialogContent>
