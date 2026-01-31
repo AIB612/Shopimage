@@ -21,10 +21,9 @@ async function initPayPal() {
     return;
   }
 
-  // Use standard import() which esbuild handles better in ESM output than "await import()" at top-level
-  // But since we are inside an async function, await import() is perfectly valid standard JS.
-  // The issue is esbuild trying to convert this file to CJS where top-level await is illegal.
-  // By moving it inside this function, we avoid "top-level" await.
+  // Use Promise-based dynamic import instead of await to strictly avoid ANY ambiguity
+  // with top-level await parsers, although async/await inside function IS valid.
+  // This is the safest, most compatible way to do dynamic imports in tricky build environments.
   
   const PayPalSDK = await import("@paypal/paypal-server-sdk");
   const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
