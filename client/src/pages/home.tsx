@@ -546,15 +546,15 @@ export default function Home() {
                     {/* Speed Scale */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-green-600">Good</span>
+                        <span className="text-green-600 font-bold">Good</span>
                         <span className="text-muted-foreground">&lt; 100ms</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-yellow-600">Needs Improvement</span>
+                        <span className="text-yellow-600 font-bold">Needs Improvement</span>
                         <span className="text-muted-foreground">100ms - 300ms</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-red-600">Poor</span>
+                        <span className="text-red-600 font-bold">Poor</span>
                         <span className="text-muted-foreground">&gt; 300ms</span>
                       </div>
                     </div>
