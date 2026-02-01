@@ -59,9 +59,17 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await registerRoutes(httpServer, app);
+  try {
+    console.log("[STARTUP] Starting server initialization...");
+    console.log(`[STARTUP] NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`[STARTUP] PORT env: ${process.env.PORT}`);
+    console.log(`[STARTUP] DATABASE_URL defined: ${!!process.env.DATABASE_URL}`);
+    console.log(`[STARTUP] PAYPAL_CLIENT_ID defined: ${!!process.env.PAYPAL_CLIENT_ID}`);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    await registerRoutes(httpServer, app);
+    console.log("[STARTUP] Routes registered.");
+
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
@@ -93,10 +101,14 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
-      log(`serving on port ${port}`);
+      log(`[STARTUP] Success! Serving on port ${port}`);
     },
   );
+} catch (error: any) {
+  console.error("[STARTUP] FATAL ERROR during initialization:");
+  console.error(error);
+  process.exit(1);
+}
 })();
