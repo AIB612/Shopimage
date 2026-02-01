@@ -121,7 +121,7 @@ export default function Home() {
           estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.2),
           format: img.format,
           timeSaved: ((img.originalSize - (img.optimizedSize || img.originalSize * 0.2)) / 1024 / 1024) / 1.5,
-          status: img.status,
+          status: img.status as "pending" | "optimized" | "reverted",
         }));
         setImages(analysisImages);
         queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
@@ -278,9 +278,13 @@ export default function Home() {
         return;
       }
       
+      // Normalize URL: remove protocol and trailing slashes
+      const domain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
+      setStoreUrl(domain);
+      
       // Transform state to scanning and trigger mutation
       setAppState("scanning");
-      scanMutation.mutate(storeUrl);
+      scanMutation.mutate(domain);
     };
 
     return (
