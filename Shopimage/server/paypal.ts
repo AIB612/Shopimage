@@ -5,16 +5,27 @@ import { Request, Response } from "express";
 
 const { PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET } = process.env;
 
-if (!PAYPAL_CLIENT_ID) {
-  throw new Error("Missing PAYPAL_CLIENT_ID");
-}
-if (!PAYPAL_CLIENT_SECRET) {
-  throw new Error("Missing PAYPAL_CLIENT_SECRET");
+console.log("[DIAGNOSTIC] Checking PayPal configuration...");
+if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+  console.error("[DIAGNOSTIC] ERROR: PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET is missing from environment!");
+  // Don't throw yet, let's see if the rest of the app can at least log more info
 }
 
-// Use a direct require to bypass esbuild's ESM/CJS compatibility issues
-const PayPalSDK = require("@paypal/paypal-server-sdk");
-const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
+// Use a safer way to require that won't crash the entire process if it fails
+let PayPalSDK;
+try {
+  PayPalSDK = require("@paypal/paypal-server-sdk");
+  console.log("[DIAGNOSTIC] PayPal SDK required successfully.");
+} catch (e: any) {
+  console.error("[DIAGNOSTIC] ERROR: Failed to require PayPal SDK:", e.message);
+}
+
+const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK || {};
+
+if (!PayPalSDK) {
+  // If we can't even require it, we must stop
+  throw new Error("PayPal SDK missing");
+}
 
 const client = new Client({
   clientCredentialsAuthCredentials: {
