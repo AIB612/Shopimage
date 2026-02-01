@@ -1,5 +1,6 @@
 // PayPal integration using @paypal/paypal-server-sdk
 import { Request, Response } from "express";
+import { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } from "@paypal/paypal-server-sdk";
 
 /* PayPal Controllers Setup */
 
@@ -11,10 +12,6 @@ if (!PAYPAL_CLIENT_ID) {
 if (!PAYPAL_CLIENT_SECRET) {
   throw new Error("Missing PAYPAL_CLIENT_SECRET");
 }
-
-// Dynamic import to handle ESM module resolution
-const PayPalSDK = await import("@paypal/paypal-server-sdk");
-const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
 
 const client = new Client({
   clientCredentialsAuthCredentials: {

@@ -30,6 +30,7 @@ const allowlist = [
   "xlsx",
   "zod",
   "zod-validation-error",
+  "@paypal/paypal-server-sdk",
 ];
 
 async function buildAll() {
