@@ -1,9 +1,5 @@
 // PayPal integration using @paypal/paypal-server-sdk
 import { Request, Response } from "express";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const PayPalSDK = require("@paypal/paypal-server-sdk");
-const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
 
 /* PayPal Controllers Setup */
 
@@ -15,6 +11,10 @@ if (!PAYPAL_CLIENT_ID) {
 if (!PAYPAL_CLIENT_SECRET) {
   throw new Error("Missing PAYPAL_CLIENT_SECRET");
 }
+
+// Use a direct require to bypass esbuild's ESM/CJS compatibility issues
+const PayPalSDK = require("@paypal/paypal-server-sdk");
+const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
 
 const client = new Client({
   clientCredentialsAuthCredentials: {
