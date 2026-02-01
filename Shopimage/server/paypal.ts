@@ -1,6 +1,9 @@
 // PayPal integration using @paypal/paypal-server-sdk
 import { Request, Response } from "express";
-import { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } from "@paypal/paypal-server-sdk";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const PayPalSDK = require("@paypal/paypal-server-sdk");
+const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
 
 /* PayPal Controllers Setup */
 
