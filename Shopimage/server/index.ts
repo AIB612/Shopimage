@@ -6,6 +6,18 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
+// Global error handlers for debugging startup crashes
+process.on("uncaughtException", (err) => {
+  console.error("CRITICAL ERROR (uncaughtException):", err.message);
+  console.error(err.stack);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("CRITICAL ERROR (unhandledRejection):", reason);
+  process.exit(1);
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
