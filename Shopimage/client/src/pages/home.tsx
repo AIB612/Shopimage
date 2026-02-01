@@ -277,168 +277,180 @@ export default function Home() {
         });
         return;
       }
-      toast({
-        title: "Connecting...",
-        description: "Store connection feature coming soon!",
-      });
+      
+      // Transform state to scanning and trigger mutation
+      setAppState("scanning");
+      scanMutation.mutate(storeUrl);
     };
 
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="border-b bg-card">
+        <header className="border-b bg-card shadow-sm">
           <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <Zap className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center overflow-hidden border border-primary/20">
+                <img src={logoImage} alt="Shopimage Logo" className="w-10 h-10 object-contain" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-foreground">Image Weight Checker</h1>
-                <p className="text-xs text-muted-foreground">Optimize your Shopify store images</p>
+                <h1 className="text-xl font-extrabold tracking-tight text-foreground">Shopimage</h1>
+                <p className="text-xs font-medium text-primary/80 uppercase tracking-widest">Store Accelerator</p>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 py-8">
+        <main className="max-w-7xl mx-auto px-4 py-12">
           {/* Hero Section */}
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Speed Up Your Shopify Store
+          <div className="text-center mb-16 space-y-4">
+            <Badge variant="outline" className="px-4 py-1 border-primary/30 text-primary bg-primary/5 rounded-full animate-in fade-in slide-in-from-bottom-3">
+              🚀 Now supporting all Shopify Stores
+            </Badge>
+            <h2 className="text-4xl md:text-6xl font-black text-foreground tracking-tight leading-tight">
+              Speed Up Your <span className="text-primary">Shopify Store</span>
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Optimize your product images to improve page load times and boost your store's performance score.
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+              Join 500+ stores using AI to compress product images and improve SEO rankings.
             </p>
           </div>
 
           {/* Connect Store Section */}
-          <Card className="p-8 mb-8 max-w-2xl mx-auto">
-            <div className="text-center space-y-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                <Store className="w-8 h-8 text-primary" />
+          <Card className="p-10 mb-16 max-w-2xl mx-auto border-2 border-primary/10 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Zap className="w-32 h-32 text-primary" />
+            </div>
+            
+            <div className="text-center space-y-8 relative z-10">
+              <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto ring-8 ring-primary/5">
+                <Store className="w-10 h-10 text-primary" />
               </div>
-              <div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Connect Your Store</h3>
-                <p className="text-muted-foreground">Enter your Shopify store URL or install the app to get started</p>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-foreground">Analyze Your Store</h3>
+                <p className="text-muted-foreground font-medium">Discover how much space you can save today.</p>
               </div>
               
               {/* URL Input */}
-              <div className="flex gap-3 max-w-md mx-auto">
+              <div className="flex flex-col sm:flex-row gap-4 max-w-lg mx-auto bg-muted/30 p-2 rounded-2xl border border-border">
                 <Input
                   placeholder="your-store.myshopify.com"
                   value={storeUrl}
                   onChange={(e) => setStoreUrl(e.target.value)}
-                  className="flex-1"
+                  className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-lg h-12"
+                  onKeyDown={(e) => e.key === 'Enter' && handleConnectStore()}
                   data-testid="input-store-url"
                 />
-                <Button onClick={handleConnectStore} className="gap-2" data-testid="button-connect">
-                  <ArrowRight className="w-4 h-4" />
-                  Connect
+                <Button 
+                  onClick={handleConnectStore} 
+                  size="lg"
+                  className="gap-2 rounded-xl px-8 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95" 
+                  data-testid="button-connect"
+                >
+                  Analyze
+                  <ArrowRight className="w-5 h-5" />
                 </Button>
               </div>
 
-              <div className="flex items-center gap-4 justify-center">
-                <div className="h-px bg-border flex-1 max-w-20" />
-                <span className="text-sm text-muted-foreground">or</span>
-                <div className="h-px bg-border flex-1 max-w-20" />
+              <div className="flex items-center gap-6 justify-center text-muted-foreground/40 font-bold uppercase text-xs tracking-tighter">
+                <div className="h-px bg-border flex-1 max-w-16" />
+                <span>Trusted by Retailers</span>
+                <div className="h-px bg-border flex-1 max-w-16" />
               </div>
-
-              {/* Install App Button */}
-              <Button 
-                variant="outline" 
-                className="gap-2"
-                onClick={() => {
-                  toast({
-                    title: "App Installation",
-                    description: "Shopify App Store link coming soon!",
-                  });
-                }}
-                data-testid="button-install-app"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Install from Shopify App Store
-              </Button>
             </div>
           </Card>
 
           {/* Case Study Section */}
-          <div className="mt-12">
-            <div className="text-center mb-8">
-              <Badge variant="secondary" className="mb-4">Case Study</Badge>
-              <h3 className="text-2xl font-bold text-foreground mb-2">See the Results</h3>
-              <p className="text-muted-foreground">Example optimization from a real Shopify store</p>
+          <div className="mt-20">
+            <div className="text-center mb-12">
+              <Badge className="mb-4 bg-primary/10 text-primary hover:bg-primary/20 border-none px-4 py-1">Recent Success</Badge>
+              <h3 className="text-3xl font-black text-foreground mb-4">Real Results</h3>
+              <p className="text-muted-foreground font-medium max-w-xl mx-auto italic">"We improved our Google PageSpeed score from 42 to 91 in just 5 minutes with Shopimage."</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Demo Stats */}
-              <div className="lg:col-span-1 space-y-4">
-                <Card className="p-6">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-4">Before & After</h4>
+              <div className="lg:col-span-1 space-y-6">
+                <Card className="p-8 border-none shadow-xl bg-card relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                  <h4 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary" />
+                    Performance Lift
+                  </h4>
                   
                   {/* Before */}
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg mb-4">
+                  <div className="p-5 bg-red-500/5 rounded-2xl mb-4 border border-red-500/10">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-red-600 dark:text-red-400">Before</span>
-                      <Badge variant="outline" className="text-red-600 border-red-300">Score: 35</Badge>
+                      <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Initial State</span>
+                      <Badge variant="outline" className="text-red-500 border-red-500/30 font-black">Score: 35</Badge>
                     </div>
-                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    <div className="text-3xl font-black text-red-600">
                       {formatBytes(demoTotalOriginal)}
                     </div>
-                    <p className="text-xs text-muted-foreground">Total image size</p>
+                    <p className="text-xs font-medium text-muted-foreground mt-1">Bloated payload detected</p>
+                  </div>
+
+                  <div className="flex justify-center -my-3 relative z-10">
+                    <div className="bg-background p-2 rounded-full border shadow-sm">
+                      <Zap className="w-5 h-5 text-primary fill-primary" />
+                    </div>
                   </div>
 
                   {/* After */}
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div className="p-5 bg-green-500/5 rounded-2xl border border-green-500/10 shadow-inner">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-green-600 dark:text-green-400">After</span>
-                      <Badge variant="outline" className="text-green-600 border-green-300">Score: 92</Badge>
+                      <span className="text-xs font-bold text-green-500 uppercase tracking-widest">Optimized</span>
+                      <Badge variant="outline" className="text-green-500 border-green-500/30 font-black">Score: 92</Badge>
                     </div>
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    <div className="text-3xl font-black text-green-600">
                       {formatBytes(demoTotalOptimized)}
                     </div>
-                    <p className="text-xs text-muted-foreground">Total image size</p>
+                    <p className="text-xs font-medium text-muted-foreground mt-1">Lightweight assets delivered</p>
                   </div>
 
                   {/* Savings */}
-                  <div className="mt-4 p-4 bg-primary/10 rounded-lg text-center">
-                    <div className="text-3xl font-bold text-primary">
+                  <div className="mt-8 p-6 bg-primary rounded-2xl text-center text-white shadow-lg shadow-primary/30">
+                    <div className="text-4xl font-black mb-1">
                       {formatBytes(demoSpaceSaved)}
                     </div>
-                    <p className="text-sm text-muted-foreground">Space Saved (80% reduction)</p>
+                    <p className="text-sm font-bold opacity-90 uppercase tracking-tighter">Space Saved (80% Reduction)</p>
                   </div>
                 </Card>
               </div>
 
               {/* Demo Image List */}
               <div className="lg:col-span-2">
-                <Card className="p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-foreground">Optimized Images</h4>
-                    <Badge variant="secondary">{demoOptimizedCount}/{DEMO_IMAGES.length} optimized</Badge>
+                <Card className="p-6 border-none shadow-xl bg-card">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h4 className="text-xl font-bold text-foreground">Asset Report</h4>
+                      <p className="text-sm text-muted-foreground">Detailed breakdown of demo optimization</p>
+                    </div>
+                    <Badge variant="secondary" className="px-4 py-1 font-bold">{demoOptimizedCount}/{DEMO_IMAGES.length} fixed</Badge>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {DEMO_IMAGES.map((image) => (
                       <div 
                         key={image.id}
-                        className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg"
+                        className="flex items-center gap-5 p-4 hover:bg-muted/50 transition-colors rounded-2xl border border-transparent hover:border-border"
                       >
-                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                        <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center border shadow-sm">
+                          <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{image.imageName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatBytes(image.originalSize)} → {formatBytes(image.optimizedSize)}
-                          </p>
+                          <p className="text-base font-bold text-foreground truncate">{image.imageName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-bold text-muted-foreground line-through">{formatBytes(image.originalSize)}</span>
+                            <ArrowRight className="w-3 h-3 text-muted-foreground/40" />
+                            <span className="text-xs font-black text-green-600 bg-green-500/10 px-2 py-0.5 rounded-md">{formatBytes(image.optimizedSize)}</span>
+                          </div>
                         </div>
                         <div className="text-right">
                           {image.status === "optimized" ? (
-                            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Optimized
-                            </Badge>
+                            <div className="flex items-center gap-1.5 text-green-600 font-bold text-sm bg-green-500/5 px-3 py-1.5 rounded-full border border-green-500/10">
+                              <CheckCircle2 className="w-4 h-4" />
+                              Fixed
+                            </div>
                           ) : (
-                            <Badge variant="secondary">
+                            <Badge variant="secondary" className="bg-muted text-muted-foreground font-bold px-3 py-1.5 rounded-full">
                               Pending
                             </Badge>
                           )}

@@ -24,69 +24,76 @@ export function ImageResultCard({ image, onFix, isFixing, index }: ImageResultCa
   const sizeSavingPercent = Math.round((sizeSaving / image.originalSize) * 100);
   
   return (
-    <Card className="p-4 bg-card shadow-sm hover-elevate">
-      <div className="flex items-center gap-4">
-        <div className="flex-shrink-0 w-16 h-16 bg-muted rounded-lg overflow-hidden flex items-center justify-center">
+    <Card className="p-5 bg-card shadow-md border-none hover:shadow-xl transition-all duration-300 group">
+      <div className="flex items-center gap-5">
+        <div className="flex-shrink-0 w-20 h-20 bg-muted rounded-2xl overflow-hidden flex items-center justify-center border-2 border-transparent group-hover:border-primary/20 transition-all">
           {image.imageUrl ? (
             <img
               src={image.imageUrl}
               alt={image.imageName}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
-                target.parentElement!.innerHTML = '<div class="flex items-center justify-center w-full h-full"><svg class="w-6 h-6 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>';
+                target.parentElement!.innerHTML = '<div class="flex items-center justify-center w-full h-full"><svg class="w-8 h-8 text-muted-foreground/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>';
               }}
             />
           ) : (
-            <ImageIcon className="w-6 h-6 text-muted-foreground" />
+            <ImageIcon className="w-8 h-8 text-muted-foreground/20" />
           )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl font-bold text-foreground">
+          <div className="flex items-center gap-3 mb-1">
+            <span className="text-2xl font-black text-foreground tracking-tighter">
               {formatBytes(image.originalSize)}
             </span>
-            {isOptimized && (
-              <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                Optimized
+            {isOptimized ? (
+              <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-none font-bold text-[10px] uppercase">
+                Fixed
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-red-500 border-red-500/20 bg-red-500/5 font-bold text-[10px] uppercase">
+                Heavy
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground truncate">
+          <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             {isOptimized ? (
-              <>Reduced to {formatBytes(image.estimatedOptimizedSize)} ({sizeSavingPercent}% smaller)</>
+              <span className="text-green-600 font-bold flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                {sizeSavingPercent}% space saved
+              </span>
             ) : (
-              <>
-                Shrink to {formatBytes(image.estimatedOptimizedSize)}: Boost Speed by {image.timeSaved.toFixed(1)}s
-              </>
+              <span className="flex items-center gap-1.5">
+                <ArrowRight className="w-3 h-3 text-primary" />
+                Target: {formatBytes(image.estimatedOptimizedSize)}
+              </span>
             )}
-          </p>
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {image.imageName}
-          </p>
+            <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
+            <span className="truncate max-w-[150px]">{image.imageName}</span>
+          </div>
         </div>
 
         <div className="flex-shrink-0">
           {isOptimized ? (
-            <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full">
-              <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+              <Check className="w-5 h-5 text-green-600" />
             </div>
           ) : (
             <Button
               onClick={onFix}
               disabled={isFixing}
-              variant="outline"
-              className="gap-2"
+              size="sm"
+              className="gap-2 rounded-xl font-bold shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all"
               data-testid={`button-fix-${index}`}
             >
               {isFixing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <Zap className="w-4 h-4" />
-                  Optimize Now
+                  <Zap className="w-4 h-4 fill-current" />
+                  Fix
                 </>
               )}
             </Button>
