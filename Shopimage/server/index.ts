@@ -2,10 +2,11 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 
 // 1. IMMEDIATE STARTUP DIAGNOSTIC (Before any other local imports)
-console.log("[STARTUP] >>> PRE-FLIGHT CHECK START <<<");
-console.log(`[STARTUP] PORT: ${process.env.PORT}`);
-console.log(`[STARTUP] DATABASE_URL present: ${!!process.env.DATABASE_URL}`);
-console.log(`[STARTUP] PAYPAL_CLIENT_ID present: ${!!process.env.PAYPAL_CLIENT_ID}`);
+    console.log("[STARTUP] >>> PRE-FLIGHT CHECK START <<<");
+    console.log(`[STARTUP] NODE_ENV is set to: ${process.env.NODE_ENV}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("[STARTUP] WARNING: Running in non-production mode on Render might cause performance issues!");
+    }
 
 if (!process.env.DATABASE_URL) {
   console.error("[STARTUP] FATAL: DATABASE_URL is NOT defined in environment variables!");
