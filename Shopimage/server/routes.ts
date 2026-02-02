@@ -213,10 +213,10 @@ export async function registerRoutes(
     return res.json({ shop, images });
   });
 
-  // Simple PayPal setup mock
-  app.get("/api/paypal/setup", (req, res) => res.json({ clientToken: "demo_token" }));
-  app.post("/api/paypal/order", (req, res) => res.json({ id: "ORDER-" + Date.now() }));
-  app.post("/api/paypal/order/:orderID/capture", (req, res) => res.json({ status: "COMPLETED" }));
+  // GDPR mandatory webhooks (Shopify requirement)
+  app.post("/api/webhooks/customers/data_request", (req, res) => res.status(200).send());
+  app.post("/api/webhooks/customers/redact", (req, res) => res.status(200).send());
+  app.post("/api/webhooks/shop/redact", (req, res) => res.status(200).send());
 
   return httpServer;
 }
