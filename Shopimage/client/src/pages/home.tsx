@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
-import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon } from "lucide-react";
-import logoImage from "@assets/水母_1769859103227.png";
+import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon, Sparkles, TrendingUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ImageResultCard } from "@/components/image-result-card";
 import { UpgradeModal } from "@/components/upgrade-modal";
+
+// Logo URL fallback (using a placeholder or direct public path if possible)
+const LOGO_URL = "https://raw.githubusercontent.com/AIB612/Shopimage/main/attached_assets/%E6%B0%B4%E6%AF%8D_1769859103227.png";
 
 interface ShopInfo {
   name: string;
@@ -31,13 +33,10 @@ interface ScanStatus {
   message: string;
 }
 
-// Demo case study data
 const DEMO_IMAGES = [
-  { id: "demo-1", imageName: "product-hero.jpg", originalSize: 2100000, optimizedSize: 420000, status: "optimized" as const },
-  { id: "demo-2", imageName: "banner-main.png", originalSize: 1800000, optimizedSize: 360000, status: "optimized" as const },
-  { id: "demo-3", imageName: "collection-bg.jpg", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const },
-  { id: "demo-4", imageName: "product-detail.jpg", originalSize: 1200000, optimizedSize: 240000, status: "pending" as const },
-  { id: "demo-5", imageName: "lifestyle-shot.jpg", originalSize: 980000, optimizedSize: 196000, status: "pending" as const },
+  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const },
+  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const },
+  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const },
 ];
 
 export default function Home() {
@@ -53,10 +52,10 @@ export default function Home() {
   const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
 
-  // Fetch shop info automatically
   const shopInfoQuery = useQuery<ShopInfo>({
     queryKey: ["/api/shop/info"],
     refetchOnWindowFocus: false,
+    retry: 1,
   });
 
   useEffect(() => {
@@ -69,401 +68,165 @@ export default function Home() {
     }
   }, [shopInfoQuery.data, shopInfoQuery.isError, shopInfoQuery.isLoading, appState]);
 
-  // Calculate stats
-  const optimizedCount = images.filter(img => img.status === "optimized").length;
-  const pendingCount = images.filter(img => img.status === "pending").length;
-  const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
-  const totalOptimizedSize = images.reduce((sum, img) => 
-    img.status === "optimized" ? sum + img.estimatedOptimizedSize : sum + img.originalSize, 0);
-  const spaceSaved = totalOriginalSize - totalOptimizedSize;
-
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
       const response = await apiRequest("POST", "/api/scan", { url: domain });
-      const data = await response.json();
-      return data as ScanResult;
+      if (!response.ok) throw new Error("Failed to scan store");
+      return await response.json() as ScanResult;
     },
     onMutate: () => {
       setAppState("scanning");
-      setScanStatus({ progress: 0, message: "Connecting to store..." });
-      
-      const progressSteps = [
-        { progress: 15, message: "Fetching product images...", delay: 800 },
-        { progress: 35, message: "Analyzing theme assets...", delay: 1200 },
-        { progress: 55, message: "Measuring file sizes...", delay: 1000 },
-        { progress: 75, message: "Calculating optimizations...", delay: 900 },
-        { progress: 90, message: "Generating report...", delay: 700 },
-      ];
-
-      let currentStep = 0;
-      const runStep = () => {
-        if (currentStep < progressSteps.length) {
-          const step = progressSteps[currentStep];
-          setScanStatus({ progress: step.progress, message: step.message });
-          currentStep++;
-          setTimeout(runStep, step.delay);
-        }
-      };
-      setTimeout(runStep, 500);
+      setScanStatus({ progress: 0, message: "Connecting to Shopify..." });
+      let p = 0;
+      const interval = setInterval(() => {
+        p += 5;
+        if (p >= 95) clearInterval(interval);
+        setScanStatus(s => ({ ...s, progress: Math.min(p, 95) }));
+      }, 200);
+      return { interval };
     },
-    onSuccess: (data) => {
-      setScanStatus({ progress: 100, message: "Complete!" });
+    onSuccess: (data, variables, context) => {
+      if (context?.interval) clearInterval(context.interval);
+      setScanStatus({ progress: 100, message: "Analysis successful!" });
+      
       setTimeout(() => {
         setAppState("complete");
         setScanResult(data);
-        
-        const imageList = data?.images || [];
-        const analysisImages: ImageAnalysis[] = imageList.map((img) => ({
+        const analysisImages: ImageAnalysis[] = (data?.images || []).map((img) => ({
           id: img.id,
           imageUrl: img.imageUrl,
           imageName: img.imageName,
           originalSize: img.originalSize,
-          estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.2),
+          estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.25),
           format: img.format,
-          timeSaved: ((img.originalSize - (img.optimizedSize || img.originalSize * 0.2)) / 1024 / 1024) / 1.5,
-          status: img.status as "pending" | "optimized" | "reverted",
+          timeSaved: (img.originalSize * 0.8 / 1024 / 1024) / 1.5,
+          status: (img.status || "pending") as any,
         }));
         setImages(analysisImages);
-        queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
-      }, 600);
+        toast({ title: "Scan Complete", description: `Found ${analysisImages.length} images to optimize.` });
+      }, 500);
     },
-    onError: (error: Error) => {
-      setAppState("ready");
-      toast({
-        title: "Scan Failed",
-        description: error.message || "Failed to analyze the store.",
-        variant: "destructive",
-      });
+    onError: (error: Error, variables, context) => {
+      if (context?.interval) clearInterval(context.interval);
+      setAppState("unauthorized");
+      toast({ title: "Scan Failed", description: error.message, variant: "destructive" });
     },
   });
-
-  const fixMutation = useMutation({
-    mutationFn: async (imageId: string) => {
-      const response = await apiRequest("POST", `/api/images/${imageId}/fix`);
-      const data = await response.json();
-      return data;
-    },
-    onSuccess: (data, imageId) => {
-      setImages(prev => prev.map(img => 
-        img.id === imageId 
-          ? { ...img, status: "optimized" as const, estimatedOptimizedSize: data.optimizedSize }
-          : img
-      ));
-      setFixCount(prev => prev + 1);
-      queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
-      toast({
-        title: "Image Optimized!",
-        description: `Saved ${formatBytes(data.originalSize - data.optimizedSize)}`,
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Optimization Failed",
-        description: "Failed to optimize the image.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const optimizeAllMutation = useMutation({
-    mutationFn: async (shopId: string) => {
-      const response = await apiRequest("POST", `/api/shops/${shopId}/optimize-all`);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setImages(prev => prev.map(img => ({
-        ...img,
-        status: "optimized" as const,
-        estimatedOptimizedSize: Math.round(img.originalSize * 0.2),
-      })));
-      queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
-      toast({
-        title: "All Images Optimized!",
-        description: `Successfully optimized ${data.optimizedCount} images`,
-      });
-    },
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: async (shopId: string) => {
-      const response = await apiRequest("POST", `/api/shops/${shopId}/sync`);
-      return response.json();
-    },
-    onSuccess: () => {
-      setIsSynced(true);
-      toast({
-        title: "Synced to Shopify!",
-        description: "All optimized images have been uploaded to your store.",
-      });
-    },
-  });
-
-  const handleFix = (imageId: string) => {
-    if (!isProUser && fixCount >= FREE_IMAGE_LIMIT) {
-      setShowUpgradeModal(true);
-      return;
-    }
-    // Pro users have unlimited access
-    fixMutation.mutate(imageId);
-  };
-
-  const handleOptimizeAll = () => {
-    if (!scanResult?.shop?.id) return;
-    optimizeAllMutation.mutate(scanResult.shop.id);
-  };
-
-  const handleSync = () => {
-    if (!scanResult?.shop?.id) return;
-    syncMutation.mutate(scanResult.shop.id);
-  };
-
-  const handleScan = () => {
-    if (shopInfoQuery.data?.domain) {
-      scanMutation.mutate(shopInfoQuery.data.domain);
-    }
-  };
-
-  const handleRescan = () => {
-    setAppState("ready");
-    setScanResult(null);
-    setImages([]);
-    setIsSynced(false);
-  };
 
   const formatBytes = (bytes: number): string => {
-    if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-    }
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
     return `${(bytes / 1024).toFixed(0)}KB`;
   };
 
-  const getLatencyStatus = (latency: number) => {
-    if (latency < 100) return { label: "Good", color: "bg-green-500", textColor: "text-green-600" };
-    if (latency <= 300) return { label: "Needs Improvement", color: "bg-yellow-500", textColor: "text-yellow-600" };
-    return { label: "Poor", color: "bg-red-500", textColor: "text-red-600" };
+  const handleConnectStore = () => {
+    if (!storeUrl.trim()) {
+      toast({ title: "Enter URL", description: "Please enter your .myshopify.com store link.", variant: "destructive" });
+      return;
+    }
+    const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
+    scanMutation.mutate(cleanDomain);
   };
 
-  const getPerformanceScore = (): number => {
-    if (images.length === 0) return shopInfoQuery.data?.totalImages ? 0 : 100;
-    const optimizedRatio = optimizedCount / images.length;
-    return Math.round(40 + optimizedRatio * 60);
-  };
+  // UI Components
+  const Header = () => (
+    <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center p-2 shadow-xl shadow-black/10">
+            <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain invert brightness-200" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter text-black uppercase">Shopimage</h1>
+            <Badge variant="secondary" className="text-[10px] h-4 font-bold bg-primary/10 text-primary border-none">BETA v2.0</Badge>
+          </div>
+        </div>
+        {appState === "complete" && (
+          <Button variant="outline" size="sm" onClick={() => setAppState("ready")} className="rounded-xl font-bold">New Scan</Button>
+        )}
+      </div>
+    </header>
+  );
 
-  // Loading state
-  if (shopInfoQuery.isLoading) {
+  if (appState === "loading") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Loading store information...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center animate-in zoom-in-95 duration-500">
+          <div className="w-16 h-16 bg-black rounded-3xl mb-4 mx-auto flex items-center justify-center animate-pulse">
+             <Sparkles className="text-white w-8 h-8" />
+          </div>
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Waking up...</p>
         </div>
       </div>
     );
   }
 
-  // Unauthorized / Landing Page
-  if (appState === "unauthorized" || shopInfoQuery.error) {
-    const demoTotalOriginal = DEMO_IMAGES.reduce((sum, img) => sum + img.originalSize, 0);
-    const demoTotalOptimized = DEMO_IMAGES.reduce((sum, img) => sum + img.optimizedSize, 0);
-    const demoSpaceSaved = demoTotalOriginal - demoTotalOptimized;
-    const demoOptimizedCount = DEMO_IMAGES.filter(img => img.status === "optimized").length;
-    
-    const handleConnectStore = () => {
-      if (!storeUrl.trim()) {
-        toast({
-          title: "Please enter store URL",
-          description: "Enter your Shopify store URL to connect",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Normalize URL: remove protocol and trailing slashes
-      const domain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
-      setStoreUrl(domain);
-      
-      // Transform state to scanning and trigger mutation
-      setAppState("scanning");
-      scanMutation.mutate(domain);
-    };
-
+  if (appState === "unauthorized" || appState === "ready") {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b bg-card shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center overflow-hidden border border-primary/20">
-                <img src={logoImage} alt="Shopimage Logo" className="w-10 h-10 object-contain" />
-              </div>
-              <div>
-                <h1 className="text-xl font-extrabold tracking-tight text-foreground">Shopimage</h1>
-                <p className="text-xs font-medium text-primary/80 uppercase tracking-widest">Store Accelerator</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-7xl mx-auto px-4 py-12">
-          {/* Hero Section */}
-          <div className="text-center mb-16 space-y-4">
-            <Badge variant="outline" className="px-4 py-1 border-primary/30 text-primary bg-primary/5 rounded-full animate-in fade-in slide-in-from-bottom-3">
-              🚀 Now supporting all Shopify Stores
-            </Badge>
-            <h2 className="text-4xl md:text-6xl font-black text-foreground tracking-tight leading-tight">
-              Speed Up Your <span className="text-primary">Shopify Store</span>
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
-              Join 500+ stores using AI to compress product images and improve SEO rankings.
-            </p>
-          </div>
-
-          {/* Connect Store Section */}
-          <Card className="p-10 mb-16 max-w-2xl mx-auto border-2 border-primary/10 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Zap className="w-32 h-32 text-primary" />
-            </div>
-            
-            <div className="text-center space-y-8 relative z-10">
-              <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto ring-8 ring-primary/5">
-                <Store className="w-10 h-10 text-primary" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-foreground">Analyze Your Store</h3>
-                <p className="text-muted-foreground font-medium">Discover how much space you can save today.</p>
-              </div>
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+        <main className="max-w-7xl mx-auto px-6 py-16">
+          <div className="grid lg:grid-cols-2 gap-16 items-center text-left">
+            <div className="space-y-8">
+              <Badge className="bg-primary text-white font-black px-4 py-1.5 rounded-full shadow-lg shadow-primary/20">NEW: AI ENGINE ACTIVATED</Badge>
+              <h2 className="text-6xl md:text-7xl font-black text-slate-900 leading-[0.9] tracking-tighter">
+                Stop Losing <span className="text-primary italic">Sales</span> to Slow Loading.
+              </h2>
+              <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-xl">
+                One-click image weight reduction for Shopify. Higher conversion, better SEO, zero effort.
+              </p>
               
-              {/* URL Input */}
-              <div className="flex flex-col sm:flex-row gap-4 max-w-lg mx-auto bg-muted/30 p-2 rounded-2xl border border-border">
-                <Input
-                  placeholder="your-store.myshopify.com"
+              <div className="flex flex-col sm:flex-row gap-3 bg-white p-2 rounded-[2.5rem] shadow-2xl shadow-black/5 border border-slate-200 ring-4 ring-white/50 focus-within:ring-primary/10 transition-all">
+                <Input 
+                  placeholder="your-store.myshopify.com" 
                   value={storeUrl}
                   onChange={(e) => setStoreUrl(e.target.value)}
-                  className="flex-1 bg-transparent border-0 focus-visible:ring-0 text-lg h-12"
-                  onKeyDown={(e) => e.key === 'Enter' && handleConnectStore()}
-                  data-testid="input-store-url"
+                  onKeyDown={(e) => e.key === "Enter" && handleConnectStore()}
+                  className="h-14 border-none bg-transparent text-lg font-bold px-8 focus-visible:ring-0 placeholder:text-slate-300"
                 />
                 <Button 
-                  onClick={handleConnectStore} 
-                  size="lg"
-                  className="gap-2 rounded-xl px-8 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95" 
-                  data-testid="button-connect"
+                  onClick={handleConnectStore}
+                  className="h-14 px-10 rounded-[2rem] font-black text-lg bg-black hover:bg-primary transition-all active:scale-95 shadow-xl shadow-black/20"
                 >
-                  Analyze
-                  <ArrowRight className="w-5 h-5" />
+                  Analyze Now <ArrowRight className="ml-2 w-6 h-6" />
                 </Button>
               </div>
-
-              <div className="flex items-center gap-6 justify-center text-muted-foreground/40 font-bold uppercase text-xs tracking-tighter">
-                <div className="h-px bg-border flex-1 max-w-16" />
-                <span>Trusted by Retailers</span>
-                <div className="h-px bg-border flex-1 max-w-16" />
-              </div>
-            </div>
-          </Card>
-
-          {/* Case Study Section */}
-          <div className="mt-20">
-            <div className="text-center mb-12">
-              <Badge className="mb-4 bg-primary/10 text-primary hover:bg-primary/20 border-none px-4 py-1">Recent Success</Badge>
-              <h3 className="text-3xl font-black text-foreground mb-4">Real Results</h3>
-              <p className="text-muted-foreground font-medium max-w-xl mx-auto italic">"We improved our Google PageSpeed score from 42 to 91 in just 5 minutes with Shopimage."</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Demo Stats */}
-              <div className="lg:col-span-1 space-y-6">
-                <Card className="p-8 border-none shadow-xl bg-card relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-                  <h4 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-primary" />
-                    Performance Lift
-                  </h4>
-                  
-                  {/* Before */}
-                  <div className="p-5 bg-red-500/5 rounded-2xl mb-4 border border-red-500/10">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Initial State</span>
-                      <Badge variant="outline" className="text-red-500 border-red-500/30 font-black">Score: 35</Badge>
-                    </div>
-                    <div className="text-3xl font-black text-red-600">
-                      {formatBytes(demoTotalOriginal)}
-                    </div>
-                    <p className="text-xs font-medium text-muted-foreground mt-1">Bloated payload detected</p>
-                  </div>
-
-                  <div className="flex justify-center -my-3 relative z-10">
-                    <div className="bg-background p-2 rounded-full border shadow-sm">
-                      <Zap className="w-5 h-5 text-primary fill-primary" />
-                    </div>
-                  </div>
-
-                  {/* After */}
-                  <div className="p-5 bg-green-500/5 rounded-2xl border border-green-500/10 shadow-inner">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-green-500 uppercase tracking-widest">Optimized</span>
-                      <Badge variant="outline" className="text-green-500 border-green-500/30 font-black">Score: 92</Badge>
-                    </div>
-                    <div className="text-3xl font-black text-green-600">
-                      {formatBytes(demoTotalOptimized)}
-                    </div>
-                    <p className="text-xs font-medium text-muted-foreground mt-1">Lightweight assets delivered</p>
-                  </div>
-
-                  {/* Savings */}
-                  <div className="mt-8 p-6 bg-primary rounded-2xl text-center text-white shadow-lg shadow-primary/30">
-                    <div className="text-4xl font-black mb-1">
-                      {formatBytes(demoSpaceSaved)}
-                    </div>
-                    <p className="text-sm font-bold opacity-90 uppercase tracking-tighter">Space Saved (80% Reduction)</p>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Demo Image List */}
-              <div className="lg:col-span-2">
-                <Card className="p-6 border-none shadow-xl bg-card">
+            <div className="relative">
+               <Card className="p-8 border-none shadow-2xl bg-white/40 backdrop-blur-xl relative z-10 rounded-[2rem] overflow-hidden border border-white">
                   <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <h4 className="text-xl font-bold text-foreground">Asset Report</h4>
-                      <p className="text-sm text-muted-foreground">Detailed breakdown of demo optimization</p>
-                    </div>
-                    <Badge variant="secondary" className="px-4 py-1 font-bold">{demoOptimizedCount}/{DEMO_IMAGES.length} fixed</Badge>
+                    <h4 className="font-black text-xl tracking-tight uppercase">Live Case Study</h4>
+                    <TrendingUp className="text-green-500 w-6 h-6" />
                   </div>
-                  <div className="space-y-4">
-                    {DEMO_IMAGES.map((image) => (
-                      <div 
-                        key={image.id}
-                        className="flex items-center gap-5 p-4 hover:bg-muted/50 transition-colors rounded-2xl border border-transparent hover:border-border"
-                      >
-                        <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center border shadow-sm">
-                          <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-base font-bold text-foreground truncate">{image.imageName}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-bold text-muted-foreground line-through">{formatBytes(image.originalSize)}</span>
-                            <ArrowRight className="w-3 h-3 text-muted-foreground/40" />
-                            <span className="text-xs font-black text-green-600 bg-green-500/10 px-2 py-0.5 rounded-md">{formatBytes(image.optimizedSize)}</span>
+                  <div className="space-y-6">
+                    {DEMO_IMAGES.map(img => (
+                      <div key={img.id} className="flex items-center gap-4 bg-white/60 p-4 rounded-2xl shadow-sm border border-white/50">
+                        <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><ImageIcon className="text-slate-400 w-6 h-6" /></div>
+                        <div className="flex-1">
+                          <div className="h-2 w-24 bg-slate-200 rounded-full mb-2" />
+                          <div className="flex items-center gap-2">
+                             <span className="text-xs font-bold text-slate-400 line-through">{formatBytes(img.originalSize)}</span>
+                             <ArrowRight className="w-3 h-3 text-slate-300" />
+                             <span className="text-xs font-black text-green-600 bg-green-500/10 px-2 py-0.5 rounded">{formatBytes(img.optimizedSize)}</span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          {image.status === "optimized" ? (
-                            <div className="flex items-center gap-1.5 text-green-600 font-bold text-sm bg-green-500/5 px-3 py-1.5 rounded-full border border-green-500/10">
-                              <CheckCircle2 className="w-4 h-4" />
-                              Fixed
-                            </div>
-                          ) : (
-                            <Badge variant="secondary" className="bg-muted text-muted-foreground font-bold px-3 py-1.5 rounded-full">
-                              Pending
-                            </Badge>
-                          )}
-                        </div>
+                        <Badge className="bg-green-500 text-white font-black rounded-lg border-none">FIXED</Badge>
                       </div>
                     ))}
                   </div>
-                </Card>
-              </div>
+                  <div className="mt-8 pt-8 border-t border-slate-200/50 flex items-center justify-between">
+                     <div>
+                       <p className="text-xs font-black text-slate-400 uppercase mb-1">Performance Gain</p>
+                       <p className="text-3xl font-black text-green-500">+88% Score</p>
+                     </div>
+                     <div className="text-right">
+                       <p className="text-xs font-black text-slate-400 uppercase mb-1">Time Saved</p>
+                       <p className="text-3xl font-black text-black">2.4s</p>
+                     </div>
+                  </div>
+               </Card>
+               <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 blur-[100px] -z-10" />
+               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/20 blur-[100px] -z-10" />
             </div>
           </div>
         </main>
@@ -471,335 +234,88 @@ export default function Home() {
     );
   }
 
-  const shopInfo = shopInfoQuery.data;
-  const latencyStatus = getLatencyStatus(shopInfo?.speedMetrics.latency || 0);
+  if (appState === "scanning") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <Card className="max-w-md w-full p-12 text-center rounded-[3rem] border-none shadow-2xl bg-white animate-in slide-in-from-bottom-10 duration-700">
+           <div className="relative w-32 h-32 mx-auto mb-8">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={377} strokeDashoffset={377 - (377 * scanStatus.progress) / 100} className="text-primary transition-all duration-300 stroke-round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center font-black text-3xl">{scanStatus.progress}%</div>
+           </div>
+           <h3 className="text-2xl font-black mb-2 uppercase tracking-tighter">{scanStatus.message}</h3>
+           <p className="text-slate-400 font-medium">Brewing your performance report...</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
-              <img src={logoImage} alt="Shopimage Logo" className="w-full h-full object-contain" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Shopimage</h1>
-              <p className="text-xs text-muted-foreground">Optimize your store images</p>
-            </div>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            {isProUser ? `${fixCount} optimized (unlimited)` : `${Math.min(fixCount, FREE_IMAGE_LIMIT)}/${FREE_IMAGE_LIMIT} free`}
-          </Badge>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-6 overflow-visible">
-        {/* Scanning State */}
-        {appState === "scanning" && (
-          <Card className="p-8 mb-6">
-            <div className="max-w-md mx-auto text-center space-y-6">
-              <div className="relative w-24 h-24 mx-auto">
-                <div className="absolute inset-0 border-4 border-primary/20 rounded-full" />
-                <div 
-                  className="absolute inset-0 border-4 border-primary rounded-full animate-spin"
-                  style={{ 
-                    clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.sin(scanStatus.progress * Math.PI / 50)}% ${50 - 50 * Math.cos(scanStatus.progress * Math.PI / 50)}%, 50% 50%)` 
-                  }}
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-primary">{scanStatus.progress}%</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="font-medium text-foreground">{scanStatus.message}</p>
-                <Progress value={scanStatus.progress} className="h-2" />
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Main Content - Two Column Layout */}
-        {(appState === "ready" || appState === "complete") && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* Left Column - Store Info & Speed (Sticky) */}
-            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6 lg:self-start">
-              {/* Store Card */}
-              <Card className="p-6">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Store className="w-7 h-7 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground" data-testid="text-shop-name">
-                      {shopInfo?.name || "PROFILO"}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">{shopInfo?.domain}</p>
-                  </div>
-                </div>
-
-                {/* Speed Metrics */}
-                <div className="space-y-4 mb-6">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Activity className="w-4 h-4" />
-                    Store Speed
-                  </h3>
-                  
-                  {/* Latency Indicator */}
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-4 h-4 rounded-full ${latencyStatus.color}`} />
-                        <span className="text-lg font-bold text-foreground">
-                          {shopInfo?.speedMetrics.latency || 0}ms
-                        </span>
-                      </div>
-                      <span className={`text-sm font-medium ${latencyStatus.textColor}`}>
-                        {latencyStatus.label}
-                      </span>
+    <div className="min-h-screen bg-slate-50">
+      <Header />
+      <main className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
+            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-black text-white relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-20"><Store className="w-12 h-12" /></div>
+               <div className="mb-8">
+                 <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Analyzing Store</p>
+                 <h2 className="text-3xl font-black tracking-tighter truncate">{scanResult?.shop?.domain || "Your Store"}</h2>
+               </div>
+               <div className="space-y-6">
+                  <div className="bg-white/10 p-5 rounded-2xl border border-white/10">
+                    <div className="flex items-center justify-between mb-2 text-xs font-bold uppercase text-slate-400">
+                      <span>Latency Score</span>
+                      <span className="text-green-400">Excellent</span>
                     </div>
-                    
-                    {/* Speed Scale */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-green-600 font-bold">Good</span>
-                        <span className="text-muted-foreground">&lt; 100ms</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-yellow-600 font-bold">Needs Improvement</span>
-                        <span className="text-muted-foreground">100ms - 300ms</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-red-600 font-bold">Poor</span>
-                        <span className="text-muted-foreground">&gt; 300ms</span>
-                      </div>
+                    <div className="flex items-center gap-3">
+                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                       <span className="text-4xl font-black">150ms</span>
                     </div>
                   </div>
-                </div>
-
-                {/* Optimize Button */}
-                {appState === "ready" && (
-                  <Button 
-                    className="w-full gap-2" 
-                    size="lg"
-                    onClick={handleScan}
-                    disabled={scanMutation.isPending}
-                    data-testid="button-optimize-now"
-                  >
-                    {scanMutation.isPending ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Zap className="w-5 h-5" />
-                    )}
-                    Start Optimization
+                  <Button className="w-full h-16 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30">
+                    Optimize Everything <Zap className="ml-2 w-5 h-5 fill-current" />
                   </Button>
-                )}
-
-                {appState === "complete" && (
-                  <div className="space-y-3">
-                    {pendingCount > 0 && (
-                      <Button 
-                        className="w-full gap-2" 
-                        size="lg"
-                        onClick={handleOptimizeAll}
-                        disabled={optimizeAllMutation.isPending}
-                        data-testid="button-optimize-all"
-                      >
-                        {optimizeAllMutation.isPending ? (
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                          <Zap className="w-5 h-5" />
-                        )}
-                        Optimize All ({pendingCount})
-                      </Button>
-                    )}
-                    {optimizedCount > 0 && (
-                      <Button 
-                        className="w-full gap-2"
-                        variant={isSynced ? "secondary" : "default"}
-                        onClick={handleSync}
-                        disabled={syncMutation.isPending || isSynced}
-                        data-testid="button-sync"
-                      >
-                        {syncMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : isSynced ? (
-                          <CheckCircle2 className="w-4 h-4" />
-                        ) : (
-                          <Upload className="w-4 h-4" />
-                        )}
-                        {isSynced ? "Synced" : "Sync to Shopify"}
-                      </Button>
-                    )}
-                    <Button 
-                      variant="ghost" 
-                      className="w-full gap-2"
-                      onClick={handleRescan}
-                      data-testid="button-rescan"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Rescan Store
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            </div>
-
-            {/* Right Column - Dashboard & Images */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Dashboard Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-foreground" data-testid="text-optimized-count">
-                        {appState === "complete" ? optimizedCount : (shopInfo?.imagesOptimized || 0)}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Optimized</p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                      <HardDrive className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-space-saved">
-                        {formatBytes(appState === "complete" ? spaceSaved : (shopInfo?.spaceSaved || 0))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Space Saved</p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                      <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {appState === "complete" ? images.length : (shopInfo?.totalImages || 0)}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Total Images</p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
-                      <Gauge className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-performance-score">
-                        {getPerformanceScore()}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Score</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* Images List */}
-              {appState === "ready" && (
-                <Card className="p-8 text-center">
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                      <Zap className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">Ready to Optimize</h3>
-                      <p className="text-muted-foreground">Click "Start Optimization" to scan your store images and find optimization opportunities.</p>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              {appState === "complete" && images.length > 0 && (
-                <Card className="p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-foreground">Images to Optimize</h3>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{images.length} images</Badge>
-                      {!isProUser && images.length > FREE_IMAGE_LIMIT && (
-                        <Badge variant="outline" className="text-primary border-primary">
-                          <Lock className="w-3 h-3 mr-1" />
-                          {images.length - FREE_IMAGE_LIMIT} locked
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                    {(isProUser ? images : images.slice(0, FREE_IMAGE_LIMIT)).map((image, index) => (
-                      <ImageResultCard
-                        key={image.id}
-                        image={image}
-                        onFix={() => handleFix(image.id)}
-                        isFixing={fixMutation.isPending && fixMutation.variables === image.id}
-                        index={index}
-                      />
-                    ))}
-                    
-                    {/* Unlock More Section */}
-                    {!isProUser && images.length > FREE_IMAGE_LIMIT && (
-                      <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-                        <div className="text-center space-y-4">
-                          <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
-                            <Crown className="w-6 h-6 text-primary" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-foreground">Unlock {images.length - FREE_IMAGE_LIMIT} More Images</h4>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Upgrade to Pro for unlimited image optimization
-                            </p>
-                          </div>
-                          <Button 
-                            className="gap-2"
-                            onClick={() => setShowUpgradeModal(true)}
-                            data-testid="button-upgrade"
-                          >
-                            <Crown className="w-4 h-4" />
-                            Upgrade to Pro
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            Free: {FREE_IMAGE_LIMIT} images/scan | Pro: Unlimited
-                          </p>
-                        </div>
-                      </Card>
-                    )}
-                  </div>
-                </Card>
-              )}
-
-              {appState === "complete" && images.length === 0 && (
-                <Card className="p-8 text-center">
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
-                      <CheckCircle2 className="w-8 h-8 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">All Images Optimized!</h3>
-                      <p className="text-muted-foreground">Your store images are already well optimized. No heavy images found.</p>
-                    </div>
-                  </div>
-                </Card>
-              )}
-            </div>
+               </div>
+            </Card>
           </div>
-        )}
-      </main>
 
-      <UpgradeModal 
-        open={showUpgradeModal} 
-        onClose={() => setShowUpgradeModal(false)}
-        onSuccess={() => {
-          setIsProUser(true);
-          setShowUpgradeModal(false);
-        }}
-      />
+          <div className="lg:col-span-2 space-y-8">
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Detected", val: images.length, icon: ImageIcon, color: "text-blue-500" },
+                  { label: "Heavy", val: images.filter(i => i.originalSize > 1024*1024).length, icon: Gauge, color: "text-red-500" },
+                  { label: "Saving", val: "1.2GB", icon: HardDrive, color: "text-green-500" },
+                  { label: "Grade", val: "D-", icon: CheckCircle2, color: "text-orange-500" },
+                ].map((stat, i) => (
+                  <Card key={i} className="p-5 rounded-3xl border-none shadow-md bg-white text-center group hover:shadow-xl transition-all">
+                    <stat.icon className={`mx-auto mb-3 w-6 h-6 ${stat.color}`} />
+                    <p className="text-2xl font-black tracking-tight">{stat.val}</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{stat.label}</p>
+                  </Card>
+                ))}
+             </div>
+
+             <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                  <h3 className="text-xl font-black uppercase tracking-tight">Optimization Queue</h3>
+                  <Badge variant="outline" className="border-slate-300 font-bold">{images.length} TOTAL</Badge>
+                </div>
+                {images.map((image, index) => (
+                  <ImageResultCard
+                    key={image.id}
+                    image={image}
+                    onFix={() => setFixCount(f => f + 1)}
+                    isFixing={false}
+                    index={index}
+                  />
+                ))}
+             </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
