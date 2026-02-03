@@ -13,8 +13,7 @@ import { ImageResultCard } from "@/components/image-result-card";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
 // Logo URL fallback (using a placeholder or direct public path if possible)
-// Use a simple SVG data URL as fallback logo
-const LOGO_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%238b5cf6'/%3E%3Ctext x='50' y='65' font-size='50' font-weight='bold' text-anchor='middle' fill='white'%3ESI%3C/text%3E%3C/svg%3E";
+const LOGO_URL = "/logo.svg";
 
 interface ShopInfo {
   name: string;
