@@ -95,12 +95,12 @@ function generateMockImages(domain: string): Array<{
   shopifyAssetId: string;
 }> {
   const productImages = [
-    { name: "premium_watch_hero.jpg", size: 2850000, format: "JPG", url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80" },
-    { name: "wireless_headphones.png", size: 4200000, format: "PNG", url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80" },
-    { name: "leather_bag_collection.jpg", size: 1950000, format: "JPG", url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80" },
-    { name: "modern_sneakers_v2.png", size: 3100000, format: "PNG", url: "https://images.unsplash.com/photo-1560343090-f0409e92791a?w=800&q=80" },
-    { name: "smart_home_speaker.jpg", size: 1250000, format: "JPG", url: "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&q=80" },
-    { name: "minimalist_desk_lamp.jpg", size: 850000, format: "JPG", url: "https://images.unsplash.com/photo-1534073828943-f801091bb18c?w=800&q=80" },
+    { name: "premium_watch_hero.jpg", size: 2850000, format: "JPG", url: "https://picsum.photos/seed/watch/400/400" },
+    { name: "wireless_headphones.png", size: 4200000, format: "PNG", url: "https://picsum.photos/seed/headphones/400/400" },
+    { name: "leather_bag_collection.jpg", size: 1950000, format: "JPG", url: "https://picsum.photos/seed/bag/400/400" },
+    { name: "modern_sneakers_v2.png", size: 3100000, format: "PNG", url: "https://picsum.photos/seed/sneakers/400/400" },
+    { name: "smart_home_speaker.jpg", size: 1250000, format: "JPG", url: "https://picsum.photos/seed/speaker/400/400" },
+    { name: "minimalist_desk_lamp.jpg", size: 850000, format: "JPG", url: "https://picsum.photos/seed/lamp/400/400" },
   ];
 
   return productImages.map((img, index) => ({
