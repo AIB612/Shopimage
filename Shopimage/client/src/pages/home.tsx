@@ -61,13 +61,15 @@ export default function Home() {
 
   useEffect(() => {
     if (appState === "loading") {
+      // Always go to ready/unauthorized after query settles
       if (shopInfoQuery.data) {
         setAppState("ready");
-      } else if (shopInfoQuery.isError || (!shopInfoQuery.isLoading && !shopInfoQuery.data)) {
+      } else if (!shopInfoQuery.isLoading) {
+        // Even if error or no data, go to unauthorized (which shows the input form)
         setAppState("unauthorized");
       }
     }
-  }, [shopInfoQuery.data, shopInfoQuery.isError, shopInfoQuery.isLoading, appState]);
+  }, [shopInfoQuery.data, shopInfoQuery.isLoading, appState]);
 
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
