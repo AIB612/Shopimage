@@ -44,6 +44,7 @@ export default function Home() {
   const [scanStatus, setScanStatus] = useState<ScanStatus>({ progress: 0, message: "" });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [images, setImages] = useState<ImageAnalysis[]>([]);
+  const [totalImageCount, setTotalImageCount] = useState(0);
   const [fixCount, setFixCount] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
   const [isProUser, setIsProUser] = useState(false);
@@ -92,7 +93,12 @@ export default function Home() {
       setTimeout(() => {
         setAppState("complete");
         setScanResult(data);
-        const analysisImages: ImageAnalysis[] = (data?.images || []).map((img) => ({
+        // Save total count for display
+        const totalCount = data?.images?.length || 0;
+        setTotalImageCount(totalCount);
+        // Only load first 20 images for performance
+        const limitedImages = (data?.images || []).slice(0, 20);
+        const analysisImages: ImageAnalysis[] = limitedImages.map((img) => ({
           id: img.id,
           imageUrl: img.imageUrl,
           imageName: img.imageName,
@@ -103,7 +109,7 @@ export default function Home() {
           status: (img.status || "pending") as any,
         }));
         setImages(analysisImages);
-        toast({ title: "Scan Complete", description: `Found ${analysisImages.length} images to optimize.` });
+        toast({ title: "Scan Complete", description: `Found ${totalCount} images to optimize.` });
       }, 500);
     },
     onError: (error: Error, variables, context) => {
@@ -324,9 +330,10 @@ export default function Home() {
              <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <h3 className="text-xl font-black uppercase tracking-tight">Optimization Queue</h3>
-                  <Badge variant="outline" className="border-slate-300 font-bold">{images.length} TOTAL</Badge>
+                  <Badge variant="outline" className="border-slate-300 font-bold">{totalImageCount} TOTAL</Badge>
                 </div>
-                {images.map((image, index) => (
+                {/* Free images (first 5) */}
+                {images.slice(0, isProUser ? images.length : FREE_IMAGE_LIMIT).map((image, index) => (
                   <ImageResultCard
                     key={image.id}
                     image={image}
@@ -335,10 +342,49 @@ export default function Home() {
                     index={index}
                   />
                 ))}
+                
+                {/* Locked images for free users */}
+                {!isProUser && totalImageCount > FREE_IMAGE_LIMIT && (
+                  <>
+                    <div className="flex items-center gap-3 px-2 py-4">
+                      <Lock className="w-5 h-5 text-slate-400" />
+                      <span className="text-sm font-bold text-slate-500">
+                        +{totalImageCount - FREE_IMAGE_LIMIT} more images locked
+                      </span>
+                      <Button 
+                        size="sm" 
+                        className="ml-auto rounded-xl font-bold"
+                        onClick={() => setShowUpgradeModal(true)}
+                      >
+                        <Crown className="w-4 h-4 mr-1" /> Unlock All
+                      </Button>
+                    </div>
+                    {images.slice(FREE_IMAGE_LIMIT, FREE_IMAGE_LIMIT + 3).map((image, index) => (
+                      <div key={image.id} className="relative">
+                        <div className="opacity-40 pointer-events-none">
+                          <ImageResultCard
+                            image={image}
+                            onFix={() => {}}
+                            isFixing={false}
+                            index={index + FREE_IMAGE_LIMIT}
+                          />
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Lock className="w-8 h-8 text-slate-400" />
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
              </div>
           </div>
         </div>
       </main>
+      <UpgradeModal 
+        open={showUpgradeModal} 
+        onClose={() => setShowUpgradeModal(false)}
+        onSuccess={() => setIsProUser(true)}
+      />
     </div>
   );
 }
