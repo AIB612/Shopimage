@@ -95,12 +95,12 @@ function generateMockImages(domain: string): Array<{
   shopifyAssetId: string;
 }> {
   const productImages = [
-    { name: "premium_watch_hero.jpg", size: 2850000, format: "JPG", url: "https://placehold.co/400x400/f1f5f9/94a3b8?text=Watch" },
-    { name: "wireless_headphones.png", size: 4200000, format: "PNG", url: "https://placehold.co/400x400/f1f5f9/94a3b8?text=Headphones" },
-    { name: "leather_bag_collection.jpg", size: 1950000, format: "JPG", url: "https://placehold.co/400x400/f1f5f9/94a3b8?text=Bag" },
-    { name: "modern_sneakers_v2.png", size: 3100000, format: "PNG", url: "https://placehold.co/400x400/f1f5f9/94a3b8?text=Sneakers" },
-    { name: "smart_home_speaker.jpg", size: 1250000, format: "JPG", url: "https://placehold.co/400x400/f1f5f9/94a3b8?text=Speaker" },
-    { name: "minimalist_desk_lamp.jpg", size: 850000, format: "JPG", url: "https://placehold.co/400x400/f1f5f9/94a3b8?text=Lamp" },
+    { name: "premium_watch_hero.jpg", size: 2850000, format: "JPG", url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&fit=crop" },
+    { name: "wireless_headphones.png", size: 4200000, format: "PNG", url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&fit=crop" },
+    { name: "leather_bag_collection.jpg", size: 1950000, format: "JPG", url: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=400&fit=crop" },
+    { name: "modern_sneakers_v2.png", size: 3100000, format: "PNG", url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&fit=crop" },
+    { name: "smart_home_speaker.jpg", size: 1250000, format: "JPG", url: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&fit=crop" },
+    { name: "minimalist_desk_lamp.jpg", size: 850000, format: "JPG", url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&fit=crop" },
   ];
 
   return productImages.map((img, index) => ({

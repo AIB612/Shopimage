@@ -34,9 +34,9 @@ interface ScanStatus {
 }
 
 const DEMO_IMAGES = [
-  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const, imageUrl: "https://placehold.co/100x100/f1f5f9/94a3b8?text=IMG" },
-  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const, imageUrl: "https://placehold.co/100x100/f1f5f9/94a3b8?text=IMG" },
-  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const, imageUrl: "https://placehold.co/100x100/f1f5f9/94a3b8?text=IMG" },
+  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const, imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&fit=crop&bg=f5f5f5" },
+  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const, imageUrl: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=100&fit=crop" },
+  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const, imageUrl: "https://images.unsplash.com/photo-1491553895911-0055uj6e?w=100&fit=crop" },
 ];
 
 export default function Home() {
