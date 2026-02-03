@@ -124,7 +124,19 @@ export default function Home() {
       return;
     }
     const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
+    
+    // Always run scan first - it will return demo data if no real token
     scanMutation.mutate(cleanDomain);
+  };
+  
+  // Function to start OAuth install flow
+  const handleInstallApp = () => {
+    const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
+    if (cleanDomain.endsWith(".myshopify.com")) {
+      window.location.href = `/api/shopify/install?shop=${cleanDomain}`;
+    } else {
+      toast({ title: "Invalid Domain", description: "Please enter a valid .myshopify.com store URL.", variant: "destructive" });
+    }
   };
 
   // UI Components
@@ -280,6 +292,15 @@ export default function Home() {
                   <Button className="w-full h-16 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30">
                     Optimize Everything <Zap className="ml-2 w-5 h-5 fill-current" />
                   </Button>
+                  {scanResult?.shop?.domain?.endsWith(".myshopify.com") && !scanResult?.shop?.accessToken && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-12 rounded-2xl border-white/20 text-white hover:bg-white/10 font-bold"
+                      onClick={handleInstallApp}
+                    >
+                      <Lock className="mr-2 w-4 h-4" /> Connect Real Store Data
+                    </Button>
+                  )}
                </div>
             </Card>
           </div>
