@@ -34,9 +34,9 @@ interface ScanStatus {
 }
 
 const DEMO_IMAGES = [
-  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const },
-  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const },
-  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const },
+  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const, imageUrl: "https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?w=100" },
+  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const, imageUrl: "https://images.pexels.com/photos/3587478/pexels-photo-3587478.jpeg?w=100" },
+  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const, imageUrl: "https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?w=100" },
 ];
 
 export default function Home() {
@@ -132,8 +132,8 @@ export default function Home() {
     <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center p-2 shadow-xl shadow-black/10">
-            <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain invert brightness-200" />
+          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center p-2 shadow-xl shadow-primary/20">
+            <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tighter text-black uppercase">Shopimage</h1>
@@ -201,7 +201,9 @@ export default function Home() {
                   <div className="space-y-6">
                     {DEMO_IMAGES.map(img => (
                       <div key={img.id} className="flex items-center gap-4 bg-white/60 p-4 rounded-2xl shadow-sm border border-white/50">
-                        <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center"><ImageIcon className="text-slate-400 w-6 h-6" /></div>
+                        <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center overflow-hidden">
+                          <img src={img.imageUrl} alt={img.imageName} className="w-full h-full object-cover" />
+                        </div>
                         <div className="flex-1">
                           <div className="h-2 w-24 bg-slate-200 rounded-full mb-2" />
                           <div className="flex items-center gap-2">
