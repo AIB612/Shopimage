@@ -34,9 +34,9 @@ interface ScanStatus {
 }
 
 const DEMO_IMAGES = [
-  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const, imageUrl: "https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?w=100" },
-  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const, imageUrl: "https://images.pexels.com/photos/3587478/pexels-photo-3587478.jpeg?w=100" },
-  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const, imageUrl: "https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?w=100" },
+  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const, imageUrl: "https://placehold.co/100x100/f1f5f9/94a3b8?text=IMG" },
+  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const, imageUrl: "https://placehold.co/100x100/f1f5f9/94a3b8?text=IMG" },
+  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const, imageUrl: "https://placehold.co/100x100/f1f5f9/94a3b8?text=IMG" },
 ];
 
 export default function Home() {
@@ -132,7 +132,7 @@ export default function Home() {
     <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center p-2 shadow-xl shadow-primary/20">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-2 shadow-xl shadow-black/10">
             <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain" />
           </div>
           <div>
