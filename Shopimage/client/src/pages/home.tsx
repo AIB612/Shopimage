@@ -132,7 +132,7 @@ export default function Home() {
     <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center p-2 shadow-xl shadow-black/10">
+          <div className="w-12 h-12 flex items-center justify-center p-1">
             <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain" />
           </div>
           <div>
