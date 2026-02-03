@@ -218,5 +218,10 @@ export async function registerRoutes(
   app.post("/api/webhooks/customers/redact", (req, res) => res.status(200).send());
   app.post("/api/webhooks/shop/redact", (req, res) => res.status(200).send());
 
+  // Shopify OAuth routes
+  app.get("/api/shopify/install", handleInstall);
+  app.get("/api/shopify/callback", handleCallback);
+  app.get("/api/shopify/session", getShopSession);
+
   return httpServer;
 }
