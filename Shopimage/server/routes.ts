@@ -95,12 +95,12 @@ function generateMockImages(domain: string): Array<{
   shopifyAssetId: string;
 }> {
   const productImages = [
-    { name: "premium_watch_hero.jpg", size: 2850000, format: "JPG", url: "https://picsum.photos/seed/watch/400/400" },
-    { name: "wireless_headphones.png", size: 4200000, format: "PNG", url: "https://picsum.photos/seed/headphones/400/400" },
-    { name: "leather_bag_collection.jpg", size: 1950000, format: "JPG", url: "https://picsum.photos/seed/bag/400/400" },
-    { name: "modern_sneakers_v2.png", size: 3100000, format: "PNG", url: "https://picsum.photos/seed/sneakers/400/400" },
-    { name: "smart_home_speaker.jpg", size: 1250000, format: "JPG", url: "https://picsum.photos/seed/speaker/400/400" },
-    { name: "minimalist_desk_lamp.jpg", size: 850000, format: "JPG", url: "https://picsum.photos/seed/lamp/400/400" },
+    { name: "premium_watch_hero.jpg", size: 2850000, format: "JPG", url: "https://images.pexels.com/photos/190819/pexels-photo-190819.jpeg?w=400" },
+    { name: "wireless_headphones.png", size: 4200000, format: "PNG", url: "https://images.pexels.com/photos/3587478/pexels-photo-3587478.jpeg?w=400" },
+    { name: "leather_bag_collection.jpg", size: 1950000, format: "JPG", url: "https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?w=400" },
+    { name: "modern_sneakers_v2.png", size: 3100000, format: "PNG", url: "https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?w=400" },
+    { name: "smart_home_speaker.jpg", size: 1250000, format: "JPG", url: "https://images.pexels.com/photos/4790255/pexels-photo-4790255.jpeg?w=400" },
+    { name: "minimalist_desk_lamp.jpg", size: 850000, format: "JPG", url: "https://images.pexels.com/photos/1112598/pexels-photo-1112598.jpeg?w=400" },
   ];
 
   return productImages.map((img, index) => ({
