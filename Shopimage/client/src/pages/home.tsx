@@ -130,7 +130,20 @@ export default function Home() {
     }
     const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
     
-    // Always run scan first - it will return demo data if no real token
+    // Validate it's a real Shopify domain
+    if (!cleanDomain.includes(".myshopify.com")) {
+      toast({ title: "Invalid Store URL", description: "Please enter a valid Shopify store URL (e.g., your-store.myshopify.com)", variant: "destructive" });
+      return;
+    }
+    
+    // Check domain format
+    const shopName = cleanDomain.replace(".myshopify.com", "");
+    if (!shopName || shopName.length < 2 || !/^[a-zA-Z0-9-]+$/.test(shopName)) {
+      toast({ title: "Invalid Store Name", description: "Store name must be at least 2 characters and contain only letters, numbers, or hyphens.", variant: "destructive" });
+      return;
+    }
+    
+    // Run scan with validated domain
     scanMutation.mutate(cleanDomain);
   };
   
@@ -336,11 +349,11 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
-            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-black text-white relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-20"><Store className="w-12 h-12" /></div>
+            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-white relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-10"><Store className="w-12 h-12 text-slate-400" /></div>
                <div className="mb-6">
                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Store</p>
-                 <h2 className="text-2xl font-black tracking-tighter truncate">{scanResult?.shop?.domain || "Your Store"}</h2>
+                 <h2 className="text-2xl font-black tracking-tighter truncate text-slate-800">{scanResult?.shop?.domain || "Your Store"}</h2>
                </div>
                
                {/* Performance Score */}
@@ -350,10 +363,10 @@ export default function Home() {
                    <span className={`text-sm font-black ${statusDisplay.textColor}`}>{statusDisplay.label}</span>
                  </div>
                  <div className="flex items-center gap-3 mb-2">
-                   <span className="text-4xl font-black text-white">{performanceScore}</span>
+                   <span className="text-4xl font-black text-slate-800">{performanceScore}</span>
                    <span className="text-lg font-bold text-slate-400">/100</span>
                  </div>
-                 <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
+                 <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
                    <div 
                      className={`h-full rounded-full transition-all duration-500 ${statusDisplay.color}`}
                      style={{ width: `${performanceScore}%` }}
@@ -365,15 +378,15 @@ export default function Home() {
                {/* Stats */}
                <div className="grid grid-cols-3 gap-4 mb-6 text-center">
                  <div>
-                   <p className="text-2xl font-black">{totalImageCount}</p>
+                   <p className="text-2xl font-black text-slate-800">{totalImageCount}</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total Images</p>
                  </div>
                  <div>
-                   <p className="text-2xl font-black">{fixCount}</p>
+                   <p className="text-2xl font-black text-slate-800">{fixCount}</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase">Optimized</p>
                  </div>
                  <div>
-                   <p className="text-2xl font-black">{calculatePotentialSavings()}MB</p>
+                   <p className="text-2xl font-black text-slate-800">{calculatePotentialSavings()}MB</p>
                    <p className="text-[10px] font-bold text-slate-400 uppercase">Potential Savings</p>
                  </div>
                </div>
