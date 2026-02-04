@@ -277,30 +277,35 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
-            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-black text-white relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-20"><Store className="w-12 h-12" /></div>
+            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-white relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-10"><Store className="w-12 h-12 text-slate-400" /></div>
                <div className="mb-8">
-                 <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Analyzing Store</p>
-                 <h2 className="text-3xl font-black tracking-tighter truncate">{scanResult?.shop?.domain || "Your Store"}</h2>
+                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Analyzing Store</p>
+                 <h2 className="text-2xl font-black tracking-tighter truncate text-slate-800">{scanResult?.shop?.domain || "Your Store"}</h2>
                </div>
                <div className="space-y-6">
-                  <div className="bg-white/10 p-5 rounded-2xl border border-white/10">
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
                     <div className="flex items-center justify-between mb-2 text-xs font-bold uppercase text-slate-400">
-                      <span>Latency Score</span>
-                      <span className="text-green-400">Excellent</span>
+                      <span>Performance Grade</span>
+                      <span className={`${scanResult?.grade === 'A' ? 'text-green-500' : scanResult?.grade === 'B' ? 'text-blue-500' : scanResult?.grade === 'C' ? 'text-yellow-500' : 'text-red-500'}`}>
+                        {scanResult?.grade === 'A' ? 'Excellent' : scanResult?.grade === 'B' ? 'Good' : scanResult?.grade === 'C' ? 'Fair' : 'Needs Work'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3">
-                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                       <span className="text-4xl font-black">150ms</span>
+                       <div className={`w-3 h-3 rounded-full animate-pulse ${scanResult?.grade === 'A' ? 'bg-green-500' : scanResult?.grade === 'B' ? 'bg-blue-500' : scanResult?.grade === 'C' ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                       <span className="text-4xl font-black text-slate-800">{scanResult?.grade || 'D'}</span>
                     </div>
                   </div>
-                  <Button className="w-full h-16 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30">
-                    Optimize Everything <Zap className="ml-2 w-5 h-5 fill-current" />
+                  <Button 
+                    className="w-full h-16 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30"
+                    onClick={() => setFixCount(f => f + 1)}
+                  >
+                    Optimize ({FREE_IMAGE_LIMIT}) <Zap className="ml-2 w-5 h-5 fill-current" />
                   </Button>
                   {scanResult?.shop?.domain?.endsWith(".myshopify.com") && !scanResult?.shop?.accessToken && (
                     <Button 
                       variant="outline" 
-                      className="w-full h-12 rounded-2xl border-white/20 text-white hover:bg-white/10 font-bold"
+                      className="w-full h-12 rounded-2xl border-slate-200 text-slate-600 hover:bg-slate-50 font-bold"
                       onClick={handleInstallApp}
                     >
                       <Lock className="mr-2 w-4 h-4" /> Connect Real Store Data
@@ -313,10 +318,10 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-8">
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: "Detected", val: images.length, icon: ImageIcon, color: "text-blue-500" },
-                  { label: "Heavy", val: images.filter(i => i.originalSize > 1024*1024).length, icon: Gauge, color: "text-red-500" },
-                  { label: "Saving", val: "1.2GB", icon: HardDrive, color: "text-green-500" },
-                  { label: "Grade", val: "D-", icon: CheckCircle2, color: "text-orange-500" },
+                  { label: "Detected", val: totalImageCount, icon: ImageIcon, color: "text-blue-500" },
+                  { label: "Heavy", val: scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 1024*1024).length, icon: Gauge, color: "text-red-500" },
+                  { label: "Saving", val: scanResult?.potentialTimeSaved ? `${scanResult.potentialTimeSaved.toFixed(1)}s` : "0s", icon: HardDrive, color: "text-green-500" },
+                  { label: "Grade", val: scanResult?.grade || "D", icon: CheckCircle2, color: scanResult?.grade === 'A' ? "text-green-500" : scanResult?.grade === 'B' ? "text-blue-500" : scanResult?.grade === 'C' ? "text-yellow-500" : "text-orange-500" },
                 ].map((stat, i) => (
                   <Card key={i} className="p-5 rounded-3xl border-none shadow-md bg-white text-center group hover:shadow-xl transition-all">
                     <stat.icon className={`mx-auto mb-3 w-6 h-6 ${stat.color}`} />
@@ -342,38 +347,21 @@ export default function Home() {
                   />
                 ))}
                 
-                {/* Locked images for free users */}
+                {/* Optimize ALL button for remaining images */}
                 {!isProUser && totalImageCount > FREE_IMAGE_LIMIT && (
-                  <>
-                    <div className="flex items-center gap-3 px-2 py-4">
-                      <Lock className="w-5 h-5 text-slate-400" />
-                      <span className="text-sm font-bold text-slate-500">
-                        +{totalImageCount - FREE_IMAGE_LIMIT} more images locked
-                      </span>
-                      <Button 
-                        size="sm" 
-                        className="ml-auto rounded-xl font-bold"
-                        onClick={() => setShowUpgradeModal(true)}
-                      >
-                        <Crown className="w-4 h-4 mr-1" /> Unlock All
-                      </Button>
-                    </div>
-                    {images.slice(FREE_IMAGE_LIMIT, FREE_IMAGE_LIMIT + 3).map((image, index) => (
-                      <div key={image.id} className="relative">
-                        <div className="opacity-40 pointer-events-none">
-                          <ImageResultCard
-                            image={image}
-                            onFix={() => {}}
-                            isFixing={false}
-                            index={index + FREE_IMAGE_LIMIT}
-                          />
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Lock className="w-8 h-8 text-slate-400" />
-                        </div>
-                      </div>
-                    ))}
-                  </>
+                  <div className="py-8 text-center">
+                    <Button 
+                      size="lg"
+                      className="h-16 px-12 rounded-2xl bg-primary text-white font-black text-xl hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30"
+                      onClick={() => setShowUpgradeModal(true)}
+                    >
+                      <Zap className="w-6 h-6 mr-2 fill-current" />
+                      Optimize ALL ({totalImageCount})
+                    </Button>
+                    <p className="text-sm text-slate-400 mt-3">
+                      +{totalImageCount - FREE_IMAGE_LIMIT} more images available with Pro
+                    </p>
+                  </div>
                 )}
              </div>
           </div>
