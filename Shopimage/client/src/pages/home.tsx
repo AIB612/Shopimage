@@ -40,7 +40,8 @@ const DEMO_IMAGES = [
 ];
 
 export default function Home() {
-  const [appState, setAppState] = useState<AppState>("loading");
+  // Start directly with "unauthorized" to show input form immediately
+  const [appState, setAppState] = useState<AppState>("unauthorized");
   const [scanStatus, setScanStatus] = useState<ScanStatus>({ progress: 0, message: "" });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [images, setImages] = useState<ImageAnalysis[]>([]);
@@ -53,23 +54,12 @@ export default function Home() {
   const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
 
+  // Shop info query - not blocking page load anymore
   const shopInfoQuery = useQuery<ShopInfo>({
     queryKey: ["/api/shop/info"],
     refetchOnWindowFocus: false,
     retry: 1,
   });
-
-  useEffect(() => {
-    if (appState === "loading") {
-      // Always go to ready/unauthorized after query settles
-      if (shopInfoQuery.data) {
-        setAppState("ready");
-      } else if (!shopInfoQuery.isLoading) {
-        // Even if error or no data, go to unauthorized (which shows the input form)
-        setAppState("unauthorized");
-      }
-    }
-  }, [shopInfoQuery.data, shopInfoQuery.isLoading, appState]);
 
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
