@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Zap, ImageIcon, ArrowRight } from "lucide-react";
+import { Check, Loader2, Zap, ImageIcon, ArrowRight, Lock } from "lucide-react";
 import type { ImageAnalysis } from "@shared/schema";
 
 interface ImageResultCardProps {
@@ -9,6 +9,7 @@ interface ImageResultCardProps {
   onFix: () => void;
   isFixing: boolean;
   index: number;
+  canFix?: boolean;  // Whether user can still fix (hasn't exceeded free limit)
 }
 
 function formatBytes(bytes: number): string {
@@ -18,7 +19,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)}KB`;
 }
 
-export function ImageResultCard({ image, onFix, isFixing, index }: ImageResultCardProps) {
+export function ImageResultCard({ image, onFix, isFixing, index, canFix = true }: ImageResultCardProps) {
   const isOptimized = image.status === "optimized";
   const sizeSaving = image.originalSize - image.estimatedOptimizedSize;
   const sizeSavingPercent = Math.round((sizeSaving / image.originalSize) * 100);
@@ -79,6 +80,10 @@ export function ImageResultCard({ image, onFix, isFixing, index }: ImageResultCa
           {isOptimized ? (
             <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
               <Check className="w-5 h-5 text-green-600" />
+            </div>
+          ) : !canFix ? (
+            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200">
+              <Lock className="w-5 h-5 text-slate-400" />
             </div>
           ) : (
             <Button

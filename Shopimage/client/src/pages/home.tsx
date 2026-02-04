@@ -162,24 +162,32 @@ export default function Home() {
   // Handle free optimization (first 5 images)
   const handleFreeOptimize = async () => {
     setIsOptimizing(true);
-    const imagesToOptimize = images.slice(0, FREE_IMAGE_LIMIT);
+    const imagesToOptimize = images.slice(0, FREE_IMAGE_LIMIT).filter(img => img.status !== 'optimized');
     
     for (let i = 0; i < imagesToOptimize.length; i++) {
-      // Simulate optimization delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setFixCount(i + 1);
-      
-      // Update image status
-      setImages(prev => prev.map((img, idx) => 
-        idx === i ? { ...img, status: 'optimized' as const } : img
-      ));
+      const image = imagesToOptimize[i];
+      try {
+        // Call real API to optimize
+        const res = await fetch(`/api/images/${image.id}/fix`, { method: 'POST' });
+        if (res.ok) {
+          const optimized = await res.json();
+          setImages(prev => prev.map(img => 
+            img.id === image.id 
+              ? { ...img, status: 'optimized' as const, estimatedOptimizedSize: optimized.optimizedSize || img.estimatedOptimizedSize }
+              : img
+          ));
+          setFixCount(f => f + 1);
+        }
+      } catch (error) {
+        console.error('Failed to optimize image:', error);
+      }
     }
     
     setIsOptimizing(false);
     setHasUsedFreeOptimize(true);
     toast({ 
       title: "Optimization Complete!", 
-      description: `Successfully optimized ${FREE_IMAGE_LIMIT} images for free.` 
+      description: `Successfully optimized ${imagesToOptimize.length} images for free.` 
     });
   };
 
@@ -460,9 +468,31 @@ export default function Home() {
                   <ImageResultCard
                     key={image.id}
                     image={image}
-                    onFix={() => setFixCount(f => f + 1)}
+                    onFix={async () => {
+                      if (fixCount >= FREE_IMAGE_LIMIT && !isProUser) {
+                        setShowUpgradeModal(true);
+                        return;
+                      }
+                      // Call real API to optimize
+                      try {
+                        const res = await fetch(`/api/images/${image.id}/fix`, { method: 'POST' });
+                        if (res.ok) {
+                          const optimized = await res.json();
+                          setImages(prev => prev.map(img => 
+                            img.id === image.id 
+                              ? { ...img, status: 'optimized' as const, estimatedOptimizedSize: optimized.optimizedSize || img.estimatedOptimizedSize }
+                              : img
+                          ));
+                          setFixCount(f => f + 1);
+                          toast({ title: "Image Optimized!", description: `Saved ${Math.round((image.originalSize - (optimized.optimizedSize || image.estimatedOptimizedSize)) / 1024)}KB` });
+                        }
+                      } catch (error) {
+                        toast({ title: "Optimization Failed", description: "Please try again.", variant: "destructive" });
+                      }
+                    }}
                     isFixing={false}
                     index={index}
+                    canFix={isProUser || fixCount < FREE_IMAGE_LIMIT}
                   />
                 ))}
                 
