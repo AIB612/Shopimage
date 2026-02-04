@@ -271,57 +271,83 @@ export default function Home() {
     );
   }
 
+  // Calculate performance score (0-100)
+  const calculatePerformanceScore = () => {
+    if (!totalImageCount) return 0;
+    const heavyImages = scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 1024*1024).length;
+    const heavyRatio = heavyImages / totalImageCount;
+    // Score: 100 if no heavy images, decreases as heavy ratio increases
+    return Math.max(0, Math.round(100 - (heavyRatio * 100)));
+  };
+  
+  const performanceScore = calculatePerformanceScore();
+  
+  // Calculate potential savings in MB
+  const calculatePotentialSavings = () => {
+    const totalOriginal = images.reduce((sum, img) => sum + img.originalSize, 0);
+    const totalOptimized = images.reduce((sum, img) => sum + img.estimatedOptimizedSize, 0);
+    return ((totalOriginal - totalOptimized) / (1024 * 1024)).toFixed(1);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
-            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-white relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-10"><Store className="w-12 h-12 text-slate-400" /></div>
-               <div className="mb-8">
-                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Analyzing Store</p>
-                 <h2 className="text-2xl font-black tracking-tighter truncate text-slate-800">{scanResult?.shop?.domain || "Your Store"}</h2>
+            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-black text-white relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-20"><Store className="w-12 h-12" /></div>
+               <div className="mb-6">
+                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Store</p>
+                 <h2 className="text-2xl font-black tracking-tighter truncate">{scanResult?.shop?.domain || "Your Store"}</h2>
                </div>
-               <div className="space-y-6">
-                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                    <div className="flex items-center justify-between mb-2 text-xs font-bold uppercase text-slate-400">
-                      <span>Performance Grade</span>
-                      <span className={`${scanResult?.grade === 'A' ? 'text-green-500' : scanResult?.grade === 'B' ? 'text-blue-500' : scanResult?.grade === 'C' ? 'text-yellow-500' : 'text-red-500'}`}>
-                        {scanResult?.grade === 'A' ? 'Excellent' : scanResult?.grade === 'B' ? 'Good' : scanResult?.grade === 'C' ? 'Fair' : 'Needs Work'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                       <div className={`w-3 h-3 rounded-full animate-pulse ${scanResult?.grade === 'A' ? 'bg-green-500' : scanResult?.grade === 'B' ? 'bg-blue-500' : scanResult?.grade === 'C' ? 'bg-yellow-500' : 'bg-red-500'}`} />
-                       <span className="text-4xl font-black text-slate-800">{scanResult?.grade || 'D'}</span>
-                    </div>
-                  </div>
-                  <Button 
-                    className="w-full h-16 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30"
-                    onClick={() => setFixCount(f => f + 1)}
-                  >
-                    Optimize ({FREE_IMAGE_LIMIT}) <Zap className="ml-2 w-5 h-5 fill-current" />
-                  </Button>
-                  {scanResult?.shop?.domain?.endsWith(".myshopify.com") && !scanResult?.shop?.accessToken && (
-                    <Button 
-                      variant="outline" 
-                      className="w-full h-12 rounded-2xl border-slate-200 text-slate-600 hover:bg-slate-50 font-bold"
-                      onClick={handleInstallApp}
-                    >
-                      <Lock className="mr-2 w-4 h-4" /> Connect Real Store Data
-                    </Button>
-                  )}
+               
+               {/* Performance Score */}
+               <div className="mb-6">
+                 <div className="flex items-center justify-between mb-2">
+                   <span className="text-xs font-bold text-slate-400 uppercase">Performance Score</span>
+                   <span className="text-lg font-black text-white">{performanceScore}/100</span>
+                 </div>
+                 <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
+                   <div 
+                     className={`h-full rounded-full transition-all duration-500 ${performanceScore >= 80 ? 'bg-green-500' : performanceScore >= 60 ? 'bg-yellow-500' : performanceScore >= 40 ? 'bg-orange-500' : 'bg-red-500'}`}
+                     style={{ width: `${performanceScore}%` }}
+                   />
+                 </div>
                </div>
+               
+               {/* Stats */}
+               <div className="grid grid-cols-3 gap-4 mb-6 text-center">
+                 <div>
+                   <p className="text-2xl font-black">{totalImageCount}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase">Total Images</p>
+                 </div>
+                 <div>
+                   <p className="text-2xl font-black">{fixCount}</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase">Optimized</p>
+                 </div>
+                 <div>
+                   <p className="text-2xl font-black">{calculatePotentialSavings()}MB</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase">Potential Savings</p>
+                 </div>
+               </div>
+               
+               <Button 
+                 className="w-full h-14 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30"
+                 onClick={() => setShowUpgradeModal(true)}
+               >
+                 Optimize All Images <Zap className="ml-2 w-5 h-5 fill-current" />
+               </Button>
             </Card>
           </div>
 
           <div className="lg:col-span-2 space-y-8">
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: "Detected", val: totalImageCount, icon: ImageIcon, color: "text-blue-500" },
-                  { label: "Heavy", val: scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 1024*1024).length, icon: Gauge, color: "text-red-500" },
-                  { label: "Saving", val: scanResult?.potentialTimeSaved ? `${scanResult.potentialTimeSaved.toFixed(1)}s` : "0s", icon: HardDrive, color: "text-green-500" },
-                  { label: "Grade", val: scanResult?.grade || "D", icon: CheckCircle2, color: scanResult?.grade === 'A' ? "text-green-500" : scanResult?.grade === 'B' ? "text-blue-500" : scanResult?.grade === 'C' ? "text-yellow-500" : "text-orange-500" },
+                  { label: "Total Images", val: totalImageCount, icon: ImageIcon, color: "text-blue-500" },
+                  { label: "Needs Optimization", val: scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 500*1024).length, icon: Gauge, color: "text-red-500" },
+                  { label: "Potential Savings", val: `${calculatePotentialSavings()}MB`, icon: HardDrive, color: "text-green-500" },
+                  { label: "Est. Speed Boost", val: scanResult?.potentialTimeSaved ? `${scanResult.potentialTimeSaved.toFixed(1)}s` : "2.5s", icon: Clock, color: "text-purple-500" },
                 ].map((stat, i) => (
                   <Card key={i} className="p-5 rounded-3xl border-none shadow-md bg-white text-center group hover:shadow-xl transition-all">
                     <stat.icon className={`mx-auto mb-3 w-6 h-6 ${stat.color}`} />
@@ -333,7 +359,7 @@ export default function Home() {
 
              <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
-                  <h3 className="text-xl font-black uppercase tracking-tight">Optimization Queue</h3>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Images</h3>
                   <Badge variant="outline" className="border-slate-300 font-bold">{totalImageCount} TOTAL</Badge>
                 </div>
                 {/* Free images (first 5) */}
