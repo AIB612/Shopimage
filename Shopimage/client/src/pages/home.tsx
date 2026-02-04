@@ -284,34 +284,29 @@ export default function Home() {
     );
   }
 
-  // Calculate performance score based on Web Vitals standards
+  // Calculate performance score based on real Web Vitals from API
   // LCP: <2.5s Good, 2.5-4s Needs Improvement, >4s Poor
   // INP: <200ms Good, 200-500ms Needs Improvement, >500ms Poor  
   // CLS: <0.1 Good, 0.1-0.25 Needs Improvement, >0.25 Poor
-  const calculatePerformanceScore = () => {
+  const getPerformanceData = () => {
+    // Use real Web Vitals from API if available
+    if (scanResult?.webVitals) {
+      const { performanceScore, status } = scanResult.webVitals;
+      return { 
+        score: performanceScore || 0, 
+        status: status || 'poor' as const 
+      };
+    }
+    
+    // Fallback to estimation if no Web Vitals data
     if (!totalImageCount) return { score: 0, status: 'poor' as const };
     
     const heavyImages = scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 1024*1024).length;
-    const totalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
-    const avgImageSize = totalSize / Math.max(images.length, 1);
-    
-    // Estimate LCP based on heavy images and average size
-    // More heavy images = slower LCP
     const heavyRatio = heavyImages / Math.max(totalImageCount, 1);
-    const estimatedLCP = 1.5 + (heavyRatio * 4) + (avgImageSize / (1024 * 1024)) * 0.5;
     
-    // Estimate CLS based on images without dimensions (assume 10% cause shifts)
-    const estimatedCLS = heavyRatio * 0.3;
+    // Estimate score based on heavy images ratio
+    const score = Math.max(0, Math.round(100 - (heavyRatio * 80)));
     
-    // Calculate individual scores (0-100)
-    let lcpScore = estimatedLCP < 2.5 ? 100 : estimatedLCP < 4.0 ? 60 : 20;
-    let clsScore = estimatedCLS < 0.1 ? 100 : estimatedCLS < 0.25 ? 60 : 20;
-    let inpScore = 80; // Assume decent INP since it's mostly JS-related
-    
-    // Weighted average (LCP most important for images)
-    const score = Math.round((lcpScore * 0.5) + (clsScore * 0.3) + (inpScore * 0.2));
-    
-    // Determine status
     let status: 'good' | 'needs-improvement' | 'poor';
     if (score >= 80) status = 'good';
     else if (score >= 50) status = 'needs-improvement';
@@ -320,7 +315,7 @@ export default function Home() {
     return { score, status };
   };
   
-  const { score: performanceScore, status: performanceStatus } = calculatePerformanceScore();
+  const { score: performanceScore, status: performanceStatus } = getPerformanceData();
   
   // Get status color and label
   const getStatusDisplay = () => {

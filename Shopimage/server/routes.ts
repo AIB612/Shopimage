@@ -119,6 +119,71 @@ function calculateGrade(totalHeavyImages: number, totalSize: number): string {
   return "D";
 }
 
+// Fetch real Web Vitals using PageSpeed Insights API
+async function fetchWebVitals(domain: string): Promise<{
+  lcp: number | null;  // in seconds
+  inp: number | null;  // in milliseconds (using FID as proxy)
+  cls: number | null;
+  performanceScore: number;
+  status: 'good' | 'needs-improvement' | 'poor';
+}> {
+  try {
+    const url = `https://${domain}`;
+    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=performance`;
+    
+    console.log(`[PageSpeed] Fetching Web Vitals for ${domain}...`);
+    
+    const response = await fetch(apiUrl, { 
+      signal: AbortSignal.timeout(30000) // 30 second timeout
+    });
+    
+    if (!response.ok) {
+      console.log(`[PageSpeed] API error: ${response.status}`);
+      return getDefaultWebVitals();
+    }
+    
+    const data = await response.json() as any;
+    const metrics = data.lighthouseResult?.audits;
+    const categories = data.lighthouseResult?.categories;
+    
+    // Extract Core Web Vitals
+    const lcp = metrics?.['largest-contentful-paint']?.numericValue / 1000 || null; // Convert to seconds
+    const cls = metrics?.['cumulative-layout-shift']?.numericValue || null;
+    const inp = metrics?.['interactive']?.numericValue || null; // Using TTI as proxy for INP
+    const performanceScore = Math.round((categories?.performance?.score || 0) * 100);
+    
+    console.log(`[PageSpeed] Results - LCP: ${lcp?.toFixed(2)}s, CLS: ${cls?.toFixed(3)}, Score: ${performanceScore}`);
+    
+    // Determine overall status based on Web Vitals thresholds
+    let status: 'good' | 'needs-improvement' | 'poor' = 'good';
+    
+    if (lcp !== null) {
+      if (lcp > 4.0) status = 'poor';
+      else if (lcp > 2.5) status = 'needs-improvement';
+    }
+    
+    if (cls !== null && status !== 'poor') {
+      if (cls > 0.25) status = 'poor';
+      else if (cls > 0.1 && status === 'good') status = 'needs-improvement';
+    }
+    
+    return { lcp, inp, cls, performanceScore, status };
+  } catch (error) {
+    console.error('[PageSpeed] Error fetching Web Vitals:', error);
+    return getDefaultWebVitals();
+  }
+}
+
+function getDefaultWebVitals() {
+  return {
+    lcp: null,
+    inp: null,
+    cls: null,
+    performanceScore: 0,
+    status: 'poor' as const
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -158,7 +223,12 @@ export async function registerRoutes(
         shop = await storage.createShop({ domain, lastScanAt: null });
       }
 
-      const shopifyImages = await fetchShopifyProducts(domain);
+      // Fetch real Web Vitals and Shopify images in parallel
+      const [webVitals, shopifyImages] = await Promise.all([
+        fetchWebVitals(domain),
+        fetchShopifyProducts(domain)
+      ]);
+      
       await storage.deleteImageLogsByShopId(shop.id);
       
       const images: ImageLog[] = [];
@@ -178,12 +248,25 @@ export async function registerRoutes(
         images.push(log);
       }
 
+      // Calculate potential time saved based on image optimization
+      const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
+      const estimatedSavings = totalOriginalSize * 0.7; // Assume 70% reduction
+      const potentialTimeSaved = (estimatedSavings / (1024 * 1024)) * 0.1; // ~0.1s per MB saved
+
       const result: ScanResult = {
         shop,
         images: images.sort((a, b) => b.originalSize - a.originalSize),
         totalHeavyImages: images.filter(img => img.originalSize > 1024 * 1024).length,
-        potentialTimeSaved: 2.5,
-        grade: calculateGrade(images.length, 10000000),
+        potentialTimeSaved: Math.round(potentialTimeSaved * 10) / 10,
+        grade: calculateGrade(images.length, totalOriginalSize),
+        // Add Web Vitals data
+        webVitals: {
+          lcp: webVitals.lcp,
+          inp: webVitals.inp,
+          cls: webVitals.cls,
+          performanceScore: webVitals.performanceScore,
+          status: webVitals.status,
+        }
       };
 
       return res.json(result);
