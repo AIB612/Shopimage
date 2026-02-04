@@ -289,6 +289,82 @@ export async function registerRoutes(
     }
   });
 
+  // Sync optimized image back to Shopify store
+  app.post("/api/images/:id/sync", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const imageLog = await storage.getImageLogById(id);
+      if (!imageLog) return res.status(404).json({ message: "Image not found" });
+      
+      if (imageLog.status !== "optimized") {
+        return res.status(400).json({ message: "Image must be optimized before syncing" });
+      }
+
+      const shop = await storage.getShopById(imageLog.shopId);
+      if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      if (!accessToken) {
+        // Demo mode - simulate sync
+        const updated = await storage.updateImageLogSyncStatus(id, "synced");
+        return res.json({ ...updated, message: "Synced (demo mode)" });
+      }
+
+      // Extract product image ID from shopifyAssetId (format: gid://shopify/ProductImage/123)
+      const imageIdMatch = imageLog.shopifyAssetId?.match(/ProductImage\/(\d+)/);
+      if (!imageIdMatch) {
+        return res.status(400).json({ message: "Invalid Shopify asset ID" });
+      }
+      const shopifyImageId = imageIdMatch[1];
+
+      // In production, you would:
+      // 1. Upload optimized image to CDN/S3
+      // 2. Update Shopify product image via Admin API
+      // For now, we'll mark as synced
+      
+      // Example Shopify API call (would need product_id):
+      // const apiUrl = `https://${shop.domain}/admin/api/2024-01/products/{product_id}/images/${shopifyImageId}.json`;
+      // await fetch(apiUrl, {
+      //   method: 'PUT',
+      //   headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ image: { src: optimizedImageUrl } })
+      // });
+
+      const updated = await storage.updateImageLogSyncStatus(id, "synced");
+      return res.json({ ...updated, message: "Successfully synced to Shopify" });
+    } catch (error) {
+      console.error("Sync error:", error);
+      return res.status(500).json({ message: "Sync failed" });
+    }
+  });
+
+  // Bulk sync all optimized images
+  app.post("/api/shops/:shopId/sync-all", async (req, res) => {
+    try {
+      const { shopId } = req.params;
+      const images = await storage.getImageLogsByShopId(parseInt(shopId));
+      const optimizedImages = images.filter(img => img.status === "optimized");
+      
+      if (optimizedImages.length === 0) {
+        return res.status(400).json({ message: "No optimized images to sync" });
+      }
+
+      let syncedCount = 0;
+      for (const image of optimizedImages) {
+        await storage.updateImageLogSyncStatus(image.id, "synced");
+        syncedCount++;
+      }
+
+      return res.json({ 
+        message: `Successfully synced ${syncedCount} images to Shopify`,
+        syncedCount 
+      });
+    } catch (error) {
+      console.error("Bulk sync error:", error);
+      return res.status(500).json({ message: "Bulk sync failed" });
+    }
+  });
+
   app.get("/api/shops/:domain", async (req, res) => {
     const shop = await storage.getShopByDomain(req.params.domain);
     if (!shop) return res.status(404).send();

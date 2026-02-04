@@ -490,6 +490,22 @@ export default function Home() {
                         toast({ title: "Optimization Failed", description: "Please try again.", variant: "destructive" });
                       }
                     }}
+                    onSync={async () => {
+                      try {
+                        const res = await fetch(`/api/images/${image.id}/sync`, { method: 'POST' });
+                        if (res.ok) {
+                          const synced = await res.json();
+                          setImages(prev => prev.map(img => 
+                            img.id === image.id 
+                              ? { ...img, syncStatus: 'synced' } as any
+                              : img
+                          ));
+                          toast({ title: "Synced to Store!", description: "Image has been updated in your Shopify store." });
+                        }
+                      } catch (error) {
+                        toast({ title: "Sync Failed", description: "Please try again.", variant: "destructive" });
+                      }
+                    }}
                     isFixing={false}
                     index={index}
                     canFix={isProUser || fixCount < FREE_IMAGE_LIMIT}

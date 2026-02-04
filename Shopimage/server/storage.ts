@@ -2,6 +2,7 @@ import type { Shop, InsertShop, ImageLog, InsertImageLog } from "@shared/schema"
 
 export interface IStorage {
   getShopByDomain(domain: string): Promise<Shop | undefined>;
+  getShopById(id: string): Promise<Shop | undefined>;
   createShop(shop: InsertShop): Promise<Shop>;
   updateShopScanTime(id: string): Promise<void>;
   updateShopToken(id: string, accessToken: string, scope: string): Promise<void>;
@@ -9,6 +10,7 @@ export interface IStorage {
   getImageLogsByShopId(shopId: string): Promise<ImageLog[]>;
   createImageLog(imageLog: InsertImageLog): Promise<ImageLog>;
   updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog>;
+  updateImageLogSyncStatus(id: string, syncStatus: "synced" | "pending"): Promise<ImageLog>;
   getImageLogById(id: string): Promise<ImageLog | undefined>;
   deleteImageLogsByShopId(shopId: string): Promise<void>;
 }
@@ -25,6 +27,10 @@ class MemoryStorage implements IStorage {
       if (shop.domain === domain) return shop;
     }
     return undefined;
+  }
+
+  async getShopById(id: string): Promise<Shop | undefined> {
+    return this.shops.get(id);
   }
 
   async createShop(shop: InsertShop): Promise<Shop> {
@@ -99,6 +105,16 @@ class MemoryStorage implements IStorage {
     return log;
   }
 
+  async updateImageLogSyncStatus(id: string, syncStatus: "synced" | "pending"): Promise<ImageLog> {
+    const log = this.imageLogs.get(id);
+    if (!log) throw new Error("Image log not found");
+    (log as any).syncStatus = syncStatus;
+    if (syncStatus === "synced") {
+      (log as any).syncedAt = new Date();
+    }
+    return log;
+  }
+
   async getImageLogById(id: string): Promise<ImageLog | undefined> {
     return this.imageLogs.get(id);
   }
@@ -139,6 +155,11 @@ class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getShopById(id: string): Promise<Shop | undefined> {
+    const result = await this.db.select().from(this.shops).where(this.eq(this.shops.id, id)).limit(1);
+    return result[0];
+  }
+
   async createShop(shop: InsertShop): Promise<Shop> {
     const result = await this.db.insert(this.shops).values(shop).returning();
     return result[0];
@@ -173,6 +194,15 @@ class DatabaseStorage implements IStorage {
     } else if (status === "pending") {
       updateData.optimizedSize = null;
       updateData.optimizedAt = null;
+    }
+    const result = await this.db.update(this.imageLogs).set(updateData).where(this.eq(this.imageLogs.id, id)).returning();
+    return result[0];
+  }
+
+  async updateImageLogSyncStatus(id: string, syncStatus: "synced" | "pending"): Promise<ImageLog> {
+    const updateData: any = { syncStatus };
+    if (syncStatus === "synced") {
+      updateData.syncedAt = new Date();
     }
     const result = await this.db.update(this.imageLogs).set(updateData).where(this.eq(this.imageLogs.id, id)).returning();
     return result[0];

@@ -1,13 +1,15 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Zap, ImageIcon, ArrowRight, Lock } from "lucide-react";
+import { Check, Loader2, Zap, ImageIcon, ArrowRight, Lock, Upload } from "lucide-react";
 import type { ImageAnalysis } from "@shared/schema";
 
 interface ImageResultCardProps {
   image: ImageAnalysis;
   onFix: () => void;
+  onSync?: () => void;
   isFixing: boolean;
+  isSyncing?: boolean;
   index: number;
   canFix?: boolean;  // Whether user can still fix (hasn't exceeded free limit)
 }
@@ -19,8 +21,9 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)}KB`;
 }
 
-export function ImageResultCard({ image, onFix, isFixing, index, canFix = true }: ImageResultCardProps) {
+export function ImageResultCard({ image, onFix, onSync, isFixing, isSyncing = false, index, canFix = true }: ImageResultCardProps) {
   const isOptimized = image.status === "optimized";
+  const isSynced = (image as any).syncStatus === "synced";
   const sizeSaving = image.originalSize - image.estimatedOptimizedSize;
   const sizeSavingPercent = Math.round((sizeSaving / image.originalSize) * 100);
   
@@ -76,8 +79,29 @@ export function ImageResultCard({ image, onFix, isFixing, index, canFix = true }
           </div>
         </div>
 
-        <div className="flex-shrink-0">
-          {isOptimized ? (
+        <div className="flex-shrink-0 flex items-center gap-2">
+          {isOptimized && !isSynced && onSync ? (
+            <Button
+              onClick={onSync}
+              disabled={isSyncing}
+              size="sm"
+              variant="outline"
+              className="gap-2 rounded-xl font-bold border-green-500/30 text-green-600 hover:bg-green-50 transition-all"
+            >
+              {isSyncing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Sync
+                </>
+              )}
+            </Button>
+          ) : isOptimized && isSynced ? (
+            <Badge className="bg-green-500 text-white font-bold px-3 py-1">
+              <Check className="w-3 h-3 mr-1" /> Synced
+            </Badge>
+          ) : isOptimized ? (
             <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
               <Check className="w-5 h-5 text-green-600" />
             </div>
