@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
-import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon, Sparkles, TrendingUp } from "lucide-react";
+import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon, Sparkles, TrendingUp, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ImageResultCard } from "@/components/image-result-card";
 import { UpgradeModal } from "@/components/upgrade-modal";
@@ -47,7 +47,8 @@ export default function Home() {
   const [images, setImages] = useState<ImageAnalysis[]>([]);
   const [totalImageCount, setTotalImageCount] = useState(0);
   const [fixCount, setFixCount] = useState(0);
-  const [isSynced, setIsSynced] = useState(false);
+  const [syncCount, setSyncCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isProUser, setIsProUser] = useState(false);
   const [hasUsedFreeOptimize, setHasUsedFreeOptimize] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -55,6 +56,9 @@ export default function Home() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
+  
+  // Count optimized but not synced images
+  const optimizedNotSynced = images.filter(img => img.status === 'optimized' && (img as any).syncStatus !== 'synced').length;
 
   // Shop info query - not blocking page load anymore
   const shopInfoQuery = useQuery<ShopInfo>({
@@ -188,6 +192,41 @@ export default function Home() {
     toast({ 
       title: "Optimization Complete!", 
       description: `Successfully optimized ${imagesToOptimize.length} images for free.` 
+    });
+  };
+
+  // Handle sync all optimized images to Shopify
+  const handleSyncAll = async () => {
+    const imagesToSync = images.filter(img => img.status === 'optimized' && (img as any).syncStatus !== 'synced');
+    if (imagesToSync.length === 0) {
+      toast({ title: "Nothing to Sync", description: "No optimized images to sync.", variant: "destructive" });
+      return;
+    }
+    
+    setIsSyncing(true);
+    let syncedCount = 0;
+    
+    for (const image of imagesToSync) {
+      try {
+        const res = await fetch(`/api/images/${image.id}/sync`, { method: 'POST' });
+        if (res.ok) {
+          setImages(prev => prev.map(img => 
+            img.id === image.id 
+              ? { ...img, syncStatus: 'synced' } as any
+              : img
+          ));
+          syncedCount++;
+          setSyncCount(c => c + 1);
+        }
+      } catch (error) {
+        console.error('Failed to sync image:', error);
+      }
+    }
+    
+    setIsSyncing(false);
+    toast({ 
+      title: "Sync Complete!", 
+      description: `Successfully synced ${syncedCount} images to your Shopify store.` 
     });
   };
 
@@ -439,6 +478,30 @@ export default function Home() {
                    </>
                  )}
                </Button>
+               
+               {/* Sync All Button - shows when there are optimized images */}
+               {fixCount > 0 && (
+                 <Button 
+                   variant="outline"
+                   className="w-full h-12 rounded-2xl border-green-500/30 text-green-600 font-bold hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
+                   onClick={handleSyncAll}
+                   disabled={isSyncing || optimizedNotSynced === 0}
+                 >
+                   {isSyncing ? (
+                     <>
+                       <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Syncing...
+                     </>
+                   ) : optimizedNotSynced > 0 ? (
+                     <>
+                       <Upload className="mr-2 w-4 h-4" /> Sync All to Store ({optimizedNotSynced})
+                     </>
+                   ) : (
+                     <>
+                       <Check className="mr-2 w-4 h-4" /> All Synced ({syncCount})
+                     </>
+                   )}
+                 </Button>
+               )}
             </Card>
           </div>
 

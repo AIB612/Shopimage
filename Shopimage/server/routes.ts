@@ -377,6 +377,11 @@ export async function registerRoutes(
   app.post("/api/webhooks/customers/redact", (req, res) => res.status(200).send());
   app.post("/api/webhooks/shop/redact", (req, res) => res.status(200).send());
 
+  // PayPal routes
+  app.get("/api/paypal/setup", loadPaypalDefault);
+  app.post("/api/paypal/order", createPaypalOrder);
+  app.post("/api/paypal/order/:orderID/capture", capturePaypalOrder);
+
   // Shopify OAuth routes
   app.get("/api/shopify/install", handleInstall);
   app.get("/api/shopify/callback", handleCallback);
