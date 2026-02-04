@@ -271,16 +271,57 @@ export default function Home() {
     );
   }
 
-  // Calculate performance score (0-100)
+  // Calculate performance score based on Web Vitals standards
+  // LCP: <2.5s Good, 2.5-4s Needs Improvement, >4s Poor
+  // INP: <200ms Good, 200-500ms Needs Improvement, >500ms Poor  
+  // CLS: <0.1 Good, 0.1-0.25 Needs Improvement, >0.25 Poor
   const calculatePerformanceScore = () => {
-    if (!totalImageCount) return 0;
+    if (!totalImageCount) return { score: 0, status: 'poor' as const };
+    
     const heavyImages = scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 1024*1024).length;
-    const heavyRatio = heavyImages / totalImageCount;
-    // Score: 100 if no heavy images, decreases as heavy ratio increases
-    return Math.max(0, Math.round(100 - (heavyRatio * 100)));
+    const totalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
+    const avgImageSize = totalSize / Math.max(images.length, 1);
+    
+    // Estimate LCP based on heavy images and average size
+    // More heavy images = slower LCP
+    const heavyRatio = heavyImages / Math.max(totalImageCount, 1);
+    const estimatedLCP = 1.5 + (heavyRatio * 4) + (avgImageSize / (1024 * 1024)) * 0.5;
+    
+    // Estimate CLS based on images without dimensions (assume 10% cause shifts)
+    const estimatedCLS = heavyRatio * 0.3;
+    
+    // Calculate individual scores (0-100)
+    let lcpScore = estimatedLCP < 2.5 ? 100 : estimatedLCP < 4.0 ? 60 : 20;
+    let clsScore = estimatedCLS < 0.1 ? 100 : estimatedCLS < 0.25 ? 60 : 20;
+    let inpScore = 80; // Assume decent INP since it's mostly JS-related
+    
+    // Weighted average (LCP most important for images)
+    const score = Math.round((lcpScore * 0.5) + (clsScore * 0.3) + (inpScore * 0.2));
+    
+    // Determine status
+    let status: 'good' | 'needs-improvement' | 'poor';
+    if (score >= 80) status = 'good';
+    else if (score >= 50) status = 'needs-improvement';
+    else status = 'poor';
+    
+    return { score, status };
   };
   
-  const performanceScore = calculatePerformanceScore();
+  const { score: performanceScore, status: performanceStatus } = calculatePerformanceScore();
+  
+  // Get status color and label
+  const getStatusDisplay = () => {
+    switch (performanceStatus) {
+      case 'good':
+        return { color: 'bg-green-500', textColor: 'text-green-500', label: '🟢 Good', desc: 'Excellent' };
+      case 'needs-improvement':
+        return { color: 'bg-yellow-500', textColor: 'text-yellow-500', label: '🟡 Needs Improvement', desc: 'Fair' };
+      case 'poor':
+        return { color: 'bg-red-500', textColor: 'text-red-500', label: '🔴 Poor', desc: 'Bad' };
+    }
+  };
+  
+  const statusDisplay = getStatusDisplay();
   
   // Calculate potential savings in MB
   const calculatePotentialSavings = () => {
@@ -306,14 +347,19 @@ export default function Home() {
                <div className="mb-6">
                  <div className="flex items-center justify-between mb-2">
                    <span className="text-xs font-bold text-slate-400 uppercase">Performance Score</span>
-                   <span className="text-lg font-black text-white">{performanceScore}/100</span>
+                   <span className={`text-sm font-black ${statusDisplay.textColor}`}>{statusDisplay.label}</span>
+                 </div>
+                 <div className="flex items-center gap-3 mb-2">
+                   <span className="text-4xl font-black text-white">{performanceScore}</span>
+                   <span className="text-lg font-bold text-slate-400">/100</span>
                  </div>
                  <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
                    <div 
-                     className={`h-full rounded-full transition-all duration-500 ${performanceScore >= 80 ? 'bg-green-500' : performanceScore >= 60 ? 'bg-yellow-500' : performanceScore >= 40 ? 'bg-orange-500' : 'bg-red-500'}`}
+                     className={`h-full rounded-full transition-all duration-500 ${statusDisplay.color}`}
                      style={{ width: `${performanceScore}%` }}
                    />
                  </div>
+                 <p className="text-xs text-slate-500 mt-2">{statusDisplay.desc}</p>
                </div>
                
                {/* Stats */}
