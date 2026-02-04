@@ -82,14 +82,20 @@ export default function Home() {
       if (context?.interval) clearInterval(context.interval);
       setScanStatus({ progress: 100, message: "Analysis successful!" });
       
+      console.log("=== SCAN SUCCESS ===");
+      console.log("Raw data:", data);
+      console.log("Images count:", data?.images?.length);
+      
       setTimeout(() => {
         setAppState("complete");
         setScanResult(data);
         // Save total count for display
         const totalCount = data?.images?.length || 0;
+        console.log("Setting totalImageCount:", totalCount);
         setTotalImageCount(totalCount);
         // Only load first 20 images for performance
         const limitedImages = (data?.images || []).slice(0, 20);
+        console.log("Limited images:", limitedImages.length);
         const analysisImages: ImageAnalysis[] = limitedImages.map((img) => ({
           id: img.id,
           imageUrl: img.imageUrl,
@@ -100,6 +106,7 @@ export default function Home() {
           timeSaved: (img.originalSize * 0.8 / 1024 / 1024) / 1.5,
           status: (img.status || "pending") as any,
         }));
+        console.log("Setting images:", analysisImages.length);
         setImages(analysisImages);
         toast({ title: "Scan Complete", description: `Found ${totalCount} images to optimize.` });
       }, 500);
