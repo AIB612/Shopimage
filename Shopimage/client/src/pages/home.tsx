@@ -49,6 +49,8 @@ export default function Home() {
   const [fixCount, setFixCount] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
   const [isProUser, setIsProUser] = useState(false);
+  const [hasUsedFreeOptimize, setHasUsedFreeOptimize] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const FREE_IMAGE_LIMIT = 5;
@@ -155,6 +157,30 @@ export default function Home() {
     } else {
       toast({ title: "Invalid Domain", description: "Please enter a valid .myshopify.com store URL.", variant: "destructive" });
     }
+  };
+
+  // Handle free optimization (first 5 images)
+  const handleFreeOptimize = async () => {
+    setIsOptimizing(true);
+    const imagesToOptimize = images.slice(0, FREE_IMAGE_LIMIT);
+    
+    for (let i = 0; i < imagesToOptimize.length; i++) {
+      // Simulate optimization delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setFixCount(i + 1);
+      
+      // Update image status
+      setImages(prev => prev.map((img, idx) => 
+        idx === i ? { ...img, status: 'optimized' as const } : img
+      ));
+    }
+    
+    setIsOptimizing(false);
+    setHasUsedFreeOptimize(true);
+    toast({ 
+      title: "Optimization Complete!", 
+      description: `Successfully optimized ${FREE_IMAGE_LIMIT} images for free.` 
+    });
   };
 
   // UI Components
@@ -387,10 +413,23 @@ export default function Home() {
                </div>
                
                <Button 
-                 className="w-full h-14 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30"
-                 onClick={() => setShowUpgradeModal(true)}
+                 className="w-full h-14 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                 onClick={hasUsedFreeOptimize ? () => setShowUpgradeModal(true) : handleFreeOptimize}
+                 disabled={isOptimizing}
                >
-                 Optimize All Images <Zap className="ml-2 w-5 h-5 fill-current" />
+                 {isOptimizing ? (
+                   <>
+                     <Loader2 className="mr-2 w-5 h-5 animate-spin" /> Optimizing...
+                   </>
+                 ) : hasUsedFreeOptimize ? (
+                   <>
+                     Optimize All ({totalImageCount}) <Zap className="ml-2 w-5 h-5 fill-current" />
+                   </>
+                 ) : (
+                   <>
+                     Optimize Now ({FREE_IMAGE_LIMIT}) <Zap className="ml-2 w-5 h-5 fill-current" />
+                   </>
+                 )}
                </Button>
             </Card>
           </div>
