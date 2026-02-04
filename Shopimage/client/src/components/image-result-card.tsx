@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Zap, ImageIcon } from "lucide-react";
+import { Check, Loader2, Zap, ImageIcon, ArrowRight } from "lucide-react";
 import type { ImageAnalysis } from "@shared/schema";
 
 interface ImageResultCardProps {
