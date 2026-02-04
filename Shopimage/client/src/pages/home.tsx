@@ -7,6 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
+// Shopify icon SVG component
+const ShopifyIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M15.337 3.415c-.022-.165-.165-.247-.275-.258-.11-.011-2.447-.176-2.447-.176s-1.623-1.612-1.8-1.789c-.177-.176-.522-.124-.656-.082-.022 0-.297.088-.77.242-.462-1.327-1.276-2.548-2.711-2.548-.077 0-.165 0-.253.011C6.07-.561 5.608-.22 5.19.22c-1.276 1.392-1.788 3.477-1.975 5.243-.99.308-1.689.528-1.777.55-.55.176-.567.187-.633.704-.055.385-1.491 11.476-1.491 11.476L13.65 20.5l6.35-1.37s-4.641-15.55-4.663-15.715zM11.13 4.656l-1.975.605c0-.484-.066-1.173-.22-1.95.55.11.935.715 1.195 1.345zm-2.447.748l-2.14.66c.209-.814.605-1.623 1.09-2.151.176-.198.429-.418.715-.55.286.572.352 1.381.335 2.041zm-1.623-2.777c.231 0 .44.044.627.132-.275.143-.539.363-.781.627-.638.693-1.129 1.777-1.326 2.822l-1.777.55c.352-1.876 1.722-4.12 3.257-4.131z"/>
+    <path d="M15.062 3.157c-.11-.011-2.447-.176-2.447-.176s-1.623-1.612-1.8-1.789c-.066-.066-.154-.099-.242-.121l-.88 17.929 6.35-1.37s-4.641-15.55-4.663-15.715c-.022-.165-.165-.247-.275-.258l-.043-.5z"/>
+  </svg>
+);
+
 import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon, Sparkles, TrendingUp, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ImageResultCard } from "@/components/image-result-card";
@@ -483,7 +491,7 @@ export default function Home() {
                {fixCount > 0 && (
                  <Button 
                    variant="outline"
-                   className="w-full h-12 rounded-2xl border-green-500/30 text-green-600 font-bold hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
+                   className="w-full h-12 rounded-2xl border-primary/30 text-primary font-bold hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
                    onClick={handleSyncAll}
                    disabled={isSyncing || optimizedNotSynced === 0}
                  >
@@ -493,7 +501,7 @@ export default function Home() {
                      </>
                    ) : optimizedNotSynced > 0 ? (
                      <>
-                       <Upload className="mr-2 w-4 h-4" /> Sync All to Store ({optimizedNotSynced})
+                       <ShopifyIcon className="mr-2 w-4 h-4" /> Sync All to Store ({optimizedNotSynced})
                      </>
                    ) : (
                      <>
