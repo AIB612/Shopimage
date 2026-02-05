@@ -57,24 +57,35 @@ export function ImageResultCard({ image, onFix, onSync, isFixing, isSyncing = fa
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <span className="text-2xl font-black text-foreground tracking-tighter">
-              {formatBytes(image.originalSize)}
-            </span>
             {isOptimized ? (
-              <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-none font-bold text-[10px] uppercase">
-                Fixed
-              </Badge>
+              <>
+                <span className="text-lg font-bold text-muted-foreground line-through">
+                  {formatBytes(image.originalSize)}
+                </span>
+                <ArrowRight className="w-4 h-4 text-green-500" />
+                <span className="text-2xl font-black text-green-600 tracking-tighter">
+                  {formatBytes(image.estimatedOptimizedSize)}
+                </span>
+                <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-none font-bold text-[10px] uppercase">
+                  -{sizeSavingPercent}%
+                </Badge>
+              </>
             ) : (
-              <Badge variant="outline" className="text-red-500 border-red-500/20 bg-red-500/5 font-bold text-[10px] uppercase">
-                Heavy
-              </Badge>
+              <>
+                <span className="text-2xl font-black text-foreground tracking-tighter">
+                  {formatBytes(image.originalSize)}
+                </span>
+                <Badge variant="outline" className="text-red-500 border-red-500/20 bg-red-500/5 font-bold text-[10px] uppercase">
+                  Heavy
+                </Badge>
+              </>
             )}
           </div>
           <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             {isOptimized ? (
               <span className="text-green-600 font-bold flex items-center gap-1">
                 <Check className="w-3 h-3" />
-                {sizeSavingPercent}% space saved
+                Saved {formatBytes(sizeSaving)}
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
