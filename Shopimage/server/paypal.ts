@@ -28,8 +28,9 @@ function getPayPalClient() {
       oAuthClientSecret: PAYPAL_CLIENT_SECRET,
     },
     timeout: 0,
-    // Always use Sandbox for testing - switch to Production when ready for live payments
-    environment: Environment.Sandbox,
+    environment: process.env.NODE_ENV === "production" 
+      ? Environment.Production 
+      : Environment.Sandbox,
     logging: {
       logLevel: LogLevel.Info,
       logRequest: { logBody: true },

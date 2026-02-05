@@ -37,21 +37,23 @@ interface ShopifyProduct {
   images: ShopifyProductImage[];
 }
 
-async function fetchShopifyProducts(domain: string): Promise<Array<{
+async function fetchShopifyProducts(domain: string, shopAccessToken?: string | null): Promise<Array<{
   imageUrl: string;
   imageName: string;
   originalSize: number;
   format: string;
   shopifyAssetId: string;
+  shopifyProductId?: string;
 }>> {
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  const accessToken = shopAccessToken || process.env.SHOPIFY_ACCESS_TOKEN;
   
   if (!accessToken) {
-    console.log(`[DEBUG] No SHOPIFY_ACCESS_TOKEN, using high-quality demo data for ${domain}`);
+    console.log(`[DEBUG] No access token for ${domain}, using demo data`);
     return generateMockImages(domain);
   }
 
   try {
+    console.log(`[Shopify] Fetching products from ${domain}...`);
     const apiUrl = `https://${domain}/admin/api/2024-01/products.json?limit=50`;
     const response = await fetch(apiUrl, {
       headers: {
@@ -227,7 +229,7 @@ export async function registerRoutes(
       // Fetch real Web Vitals and Shopify images in parallel
       const [webVitals, shopifyImages] = await Promise.all([
         fetchWebVitals(domain),
-        fetchShopifyProducts(domain)
+        fetchShopifyProducts(domain, shop.accessToken)
       ]);
       
       await storage.deleteImageLogsByShopId(shop.id);
