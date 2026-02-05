@@ -15,19 +15,25 @@ export const shops = pgTable("shops", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const syncStatusEnum = pgEnum("sync_status", ["pending", "synced", "failed"]);
+
 export const imageLogs = pgTable("image_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   shopId: varchar("shop_id").references(() => shops.id).notNull(),
   shopifyAssetId: text("shopify_asset_id").notNull(),
+  shopifyProductId: text("shopify_product_id"), // Product ID for API updates
   imageUrl: text("image_url").notNull(),
   imageName: text("image_name").notNull(),
   originalSize: integer("original_size").notNull(),
   optimizedSize: integer("optimized_size"),
+  optimizedUrl: text("optimized_url"), // URL of optimized image (Shopify Files)
   format: text("format").notNull(),
   status: imageStatusEnum("status").default("pending").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("pending"),
   originalS3Key: text("original_s3_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   optimizedAt: timestamp("optimized_at"),
+  syncedAt: timestamp("synced_at"),
 });
 
 export const insertShopSchema = createInsertSchema(shops).omit({

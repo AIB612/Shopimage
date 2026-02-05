@@ -77,14 +77,18 @@ class MemoryStorage implements IStorage {
       id,
       shopId: imageLog.shopId,
       shopifyAssetId: imageLog.shopifyAssetId,
+      shopifyProductId: (imageLog as any).shopifyProductId || null,
       imageUrl: imageLog.imageUrl,
       imageName: imageLog.imageName,
       originalSize: imageLog.originalSize,
       optimizedSize: imageLog.optimizedSize || null,
+      optimizedUrl: null,
       format: imageLog.format,
       status: imageLog.status || "pending",
+      syncStatus: "pending",
       originalS3Key: imageLog.originalS3Key || null,
       optimizedAt: imageLog.optimizedAt || null,
+      syncedAt: null,
       createdAt: new Date(),
     };
     this.imageLogs.set(id, newLog);
