@@ -74,8 +74,9 @@ export async function loadPaypalDefault(req: Request, res: Response) {
     const clientToken = await getClientToken();
     res.json({ clientToken });
   } catch (error: any) {
-    console.error("[PayPal] Failed to get client token:", error.message);
-    res.status(500).json({ error: "Failed to initialize PayPal", details: error.message });
+    console.error("[PayPal] Failed to get client token:", error);
+    const errorMessage = error?.message || error?.body || JSON.stringify(error) || "Unknown error";
+    res.status(500).json({ error: "Failed to initialize PayPal", details: errorMessage });
   }
 }
 
