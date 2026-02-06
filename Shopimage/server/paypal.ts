@@ -22,15 +22,23 @@ function getPayPalClient() {
   const PayPalSDK = require("@paypal/paypal-server-sdk");
   const { Client, Environment, LogLevel, OAuthAuthorizationController, OrdersController } = PayPalSDK;
 
+  // Use PAYPAL_MODE env var, or default to production on Render
+  const isProduction = process.env.PAYPAL_MODE === "live" || 
+                       process.env.PAYPAL_MODE === "production" ||
+                       process.env.RENDER === "true" ||
+                       process.env.NODE_ENV === "production";
+  
+  console.log("[PayPal] Initializing client...");
+  console.log("[PayPal] Mode:", isProduction ? "PRODUCTION" : "SANDBOX");
+  console.log("[PayPal] CLIENT_ID starts with:", PAYPAL_CLIENT_ID?.substring(0, 10) + "...");
+  
   client = new Client({
     clientCredentialsAuthCredentials: {
       oAuthClientId: PAYPAL_CLIENT_ID,
       oAuthClientSecret: PAYPAL_CLIENT_SECRET,
     },
     timeout: 0,
-    environment: process.env.NODE_ENV === "production" 
-      ? Environment.Production 
-      : Environment.Sandbox,
+    environment: isProduction ? Environment.Production : Environment.Sandbox,
     logging: {
       logLevel: LogLevel.Info,
       logRequest: { logBody: true },
