@@ -258,7 +258,7 @@ export default function Home() {
   const Header = () => (
     <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <a href="/" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
           <div className="w-12 h-12 flex items-center justify-center p-1">
             <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain" />
           </div>
@@ -266,7 +266,7 @@ export default function Home() {
             <h1 className="text-2xl font-black tracking-tighter text-black uppercase">Shopimage</h1>
             <Badge variant="secondary" className="text-[10px] h-4 font-bold bg-primary/10 text-primary border-none">BETA v2.0</Badge>
           </div>
-        </div>
+        </a>
         {appState === "complete" && (
           <Button variant="outline" size="sm" onClick={() => setAppState("ready")} className="rounded-xl font-bold">New Scan</Button>
         )}
