@@ -78,8 +78,19 @@ export default function Home() {
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
       const response = await apiRequest("POST", "/api/scan", { url: domain });
-      if (!response.ok) throw new Error("Failed to scan store");
-      return await response.json() as ScanResult;
+      const data = await response.json();
+      
+      // Check if needs install
+      if (!response.ok) {
+        if (data.needsInstall && data.installUrl) {
+          // Redirect to Shopify install
+          window.location.href = data.installUrl;
+          throw new Error("Redirecting to install...");
+        }
+        throw new Error(data.message || "Failed to scan store");
+      }
+      
+      return data as ScanResult;
     },
     onMutate: () => {
       setAppState("scanning");
@@ -127,6 +138,11 @@ export default function Home() {
     },
     onError: (error: Error, variables, context) => {
       if (context?.interval) clearInterval(context.interval);
+      // Don't show error if redirecting to install
+      if (error.message === "Redirecting to install...") {
+        setScanStatus({ progress: 50, message: "Redirecting to Shopify..." });
+        return;
+      }
       setAppState("unauthorized");
       toast({ title: "Scan Failed", description: error.message, variant: "destructive" });
     },

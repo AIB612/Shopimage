@@ -37,24 +37,32 @@ interface ShopifyProduct {
   images: ShopifyProductImage[];
 }
 
-async function fetchShopifyProducts(domain: string, shopAccessToken?: string | null): Promise<Array<{
-  imageUrl: string;
-  imageName: string;
-  originalSize: number;
-  format: string;
-  shopifyAssetId: string;
-  shopifyProductId?: string;
-}>> {
+async function fetchShopifyProducts(domain: string, shopAccessToken?: string | null): Promise<{
+  needsInstall: boolean;
+  installUrl?: string;
+  images: Array<{
+    imageUrl: string;
+    imageName: string;
+    originalSize: number;
+    format: string;
+    shopifyAssetId: string;
+    shopifyProductId?: string;
+  }>;
+}> {
   const accessToken = shopAccessToken || process.env.SHOPIFY_ACCESS_TOKEN;
   
   if (!accessToken) {
-    console.log(`[DEBUG] No access token for ${domain}, using demo data`);
-    return generateMockImages(domain);
+    console.log(`[Shopify] No access token for ${domain}, needs install`);
+    return {
+      needsInstall: true,
+      installUrl: `/api/shopify/install?shop=${encodeURIComponent(domain)}`,
+      images: []
+    };
   }
 
   try {
     console.log(`[Shopify] Fetching products from ${domain}...`);
-    const apiUrl = `https://${domain}/admin/api/2024-01/products.json?limit=50`;
+    const apiUrl = `https://${domain}/admin/api/2024-01/products.json?limit=250`;
     const response = await fetch(apiUrl, {
       headers: {
         "X-Shopify-Access-Token": accessToken,
@@ -63,7 +71,17 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
     });
 
     if (!response.ok) {
-      return generateMockImages(domain);
+      const errorText = await response.text();
+      console.error(`[Shopify] API error for ${domain}:`, response.status, errorText);
+      // Token might be invalid, needs reinstall
+      if (response.status === 401 || response.status === 403) {
+        return {
+          needsInstall: true,
+          installUrl: `/api/shopify/install?shop=${encodeURIComponent(domain)}`,
+          images: []
+        };
+      }
+      return { needsInstall: false, images: [] };
     }
 
     const data = await response.json() as { products: ShopifyProduct[] };
@@ -84,9 +102,12 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
         });
       }
     }
-    return allImages.length > 0 ? allImages : generateMockImages(domain);
+    
+    console.log(`[Shopify] Found ${allImages.length} images for ${domain}`);
+    return { needsInstall: false, images: allImages };
   } catch (error) {
-    return generateMockImages(domain);
+    console.error(`[Shopify] Fetch error for ${domain}:`, error);
+    return { needsInstall: false, images: [] };
   }
 }
 
@@ -226,16 +247,32 @@ export async function registerRoutes(
         shop = await storage.createShop({ domain, lastScanAt: null });
       }
 
-      // Fetch real Web Vitals and Shopify images in parallel
-      const [webVitals, shopifyImages] = await Promise.all([
-        fetchWebVitals(domain),
-        fetchShopifyProducts(domain, shop.accessToken)
-      ]);
+      // Fetch Shopify images (will check if install is needed)
+      const shopifyResult = await fetchShopifyProducts(domain, shop.accessToken);
+      
+      // If needs install, return install URL
+      if (shopifyResult.needsInstall) {
+        return res.status(401).json({ 
+          needsInstall: true,
+          installUrl: shopifyResult.installUrl,
+          message: "Please install the app to access your store's images"
+        });
+      }
+
+      // If no images found
+      if (shopifyResult.images.length === 0) {
+        return res.status(404).json({ 
+          message: "No product images found in your store"
+        });
+      }
+
+      // Fetch Web Vitals in parallel (don't block on this)
+      const webVitals = await fetchWebVitals(domain);
       
       await storage.deleteImageLogsByShopId(shop.id);
       
       const images: ImageLog[] = [];
-      for (const img of shopifyImages) {
+      for (const img of shopifyResult.images) {
         const log = await storage.createImageLog({
           shopId: shop.id,
           shopifyAssetId: img.shopifyAssetId,
