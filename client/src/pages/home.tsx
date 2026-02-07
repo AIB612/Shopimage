@@ -53,13 +53,36 @@ export default function Home() {
   const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
 
+  // Get shop from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const shopFromUrl = urlParams.get("shop");
+
   // Fetch shop info automatically
   const shopInfoQuery = useQuery<ShopInfo>({
-    queryKey: ["/api/shop/info"],
+    queryKey: ["/api/shop/info", shopFromUrl],
+    queryFn: async () => {
+      if (!shopFromUrl) {
+        throw new Error("No shop parameter");
+      }
+      const response = await fetch(`/api/shop/info?shop=${encodeURIComponent(shopFromUrl)}`);
+      if (!response.ok) {
+        const data = await response.json();
+        if (data.installUrl) {
+          window.location.href = data.installUrl;
+        }
+        throw new Error(data.error || "Failed to fetch shop info");
+      }
+      return response.json();
+    },
+    enabled: !!shopFromUrl,
     refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
+    if (!shopFromUrl) {
+      setAppState("unauthorized");
+      return;
+    }
     if (appState === "loading") {
       if (shopInfoQuery.data) {
         setAppState("ready");
@@ -67,7 +90,7 @@ export default function Home() {
         setAppState("unauthorized");
       }
     }
-  }, [shopInfoQuery.data, shopInfoQuery.isError, shopInfoQuery.isLoading, appState]);
+  }, [shopInfoQuery.data, shopInfoQuery.isError, shopInfoQuery.isLoading, appState, shopFromUrl]);
 
   // Calculate stats
   const optimizedCount = images.filter(img => img.status === "optimized").length;

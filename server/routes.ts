@@ -44,16 +44,18 @@ async function fetchShopifyProducts(domain: string): Promise<Array<{
   format: string;
   shopifyAssetId: string;
 }>> {
-  const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  // Get access token from database for this shop
+  const shop = await storage.getShopByDomain(domain);
+  const accessToken = shop?.accessToken;
   
   if (!accessToken) {
-    console.log("No SHOPIFY_ACCESS_TOKEN found, using mock data");
+    console.log(`[Shopify] No access token found for ${domain}, using mock data`);
     return generateMockImages(domain);
   }
 
   try {
     const apiUrl = `https://${domain}/admin/api/2024-01/products.json?limit=50`;
-    console.log(`Fetching products from: ${apiUrl}`);
+    console.log(`[Shopify] Fetching products from ${domain}...`);
     
     const response = await fetch(apiUrl, {
       headers: {
@@ -63,9 +65,8 @@ async function fetchShopifyProducts(domain: string): Promise<Array<{
     });
 
     if (!response.ok) {
-      console.error(`Shopify API error: ${response.status} ${response.statusText}`);
       const errorText = await response.text();
-      console.error("Error details:", errorText);
+      console.error(`[Shopify] API error for ${domain}: ${response.status} ${errorText}`);
       return generateMockImages(domain);
     }
 
@@ -163,42 +164,48 @@ export async function registerRoutes(
   // Get shop info automatically (for embedded Shopify app)
   app.get("/api/shop/info", async (req, res) => {
     try {
-      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      // Get shop domain from query param or header
+      const shopDomain = req.query.shop as string || req.headers["x-shopify-shop-domain"] as string;
       
-      // For embedded app, get shop domain from session or use default
-      // In a real embedded app, this would come from Shopify OAuth session
-      const shopDomain = "aanderonline.myshopify.com";
+      if (!shopDomain) {
+        return res.status(400).json({ error: "Missing shop parameter" });
+      }
       
-      let shopName = "PROFILO";
+      // Get shop from database
+      const shop = await storage.getShopByDomain(shopDomain);
+      
+      if (!shop || !shop.accessToken) {
+        return res.status(401).json({ 
+          error: "Shop not installed",
+          installUrl: `/api/shopify/install?shop=${encodeURIComponent(shopDomain)}`
+        });
+      }
+      
+      let shopName = shopDomain.replace(".myshopify.com", "");
       let shopDomainResult = shopDomain;
       
-      // Try to fetch real shop info if token is available
-      if (accessToken) {
-        try {
-          const shopInfoUrl = `https://${shopDomain}/admin/api/2024-01/shop.json`;
-          const response = await fetch(shopInfoUrl, {
-            headers: {
-              "X-Shopify-Access-Token": accessToken,
-              "Content-Type": "application/json",
-            },
-          });
+      // Try to fetch real shop info from Shopify
+      try {
+        const shopInfoUrl = `https://${shopDomain}/admin/api/2024-01/shop.json`;
+        const response = await fetch(shopInfoUrl, {
+          headers: {
+            "X-Shopify-Access-Token": shop.accessToken,
+            "Content-Type": "application/json",
+          },
+        });
 
-          if (response.ok) {
-            const data = await response.json() as { shop: { name: string; domain: string; myshopify_domain: string } };
-            shopName = data.shop.name;
-            shopDomainResult = data.shop.myshopify_domain;
-          }
-        } catch (err) {
-          console.log("Could not fetch shop info from Shopify, using defaults");
+        if (response.ok) {
+          const data = await response.json() as { shop: { name: string; domain: string; myshopify_domain: string } };
+          shopName = data.shop.name;
+          shopDomainResult = data.shop.myshopify_domain;
         }
+      } catch (err) {
+        console.log("Could not fetch shop info from Shopify, using defaults");
       }
       
       // Calculate speed metrics (simulated based on image analysis)
-      const shop = await storage.getShopByDomain(shopDomain);
       let images: ImageLog[] = [];
-      if (shop) {
-        images = await storage.getImageLogsByShopId(shop.id);
-      }
+      images = await storage.getImageLogsByShopId(shop.id);
       
       const totalImageSize = images.reduce((sum, img) => sum + img.originalSize, 0);
       const avgImageSize = images.length > 0 ? totalImageSize / images.length : 0;
