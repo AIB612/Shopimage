@@ -62,6 +62,7 @@ export default function Home() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [autoScanTriggered, setAutoScanTriggered] = useState(false);
   const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
   
@@ -74,6 +75,26 @@ export default function Home() {
     refetchOnWindowFocus: false,
     retry: 1,
   });
+
+  // Auto-scan when returning from OAuth install
+  useEffect(() => {
+    if (autoScanTriggered) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const shop = params.get("shop");
+    const installed = params.get("installed");
+    
+    if (shop && installed === "true") {
+      setAutoScanTriggered(true);
+      setStoreUrl(shop);
+      // Clean up URL
+      window.history.replaceState({}, "", "/");
+      // Trigger scan after a short delay
+      setTimeout(() => {
+        scanMutation.mutate(shop);
+      }, 100);
+    }
+  }, [autoScanTriggered]);
 
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
