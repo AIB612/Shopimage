@@ -15,6 +15,15 @@ const MAX_TIMESTAMP_AGE_SEC = 60;
 const nonceStore = new Map<string, { shop: string; createdAt: number }>();
 
 function getBaseUrl(): string {
+  // Render / custom deployment
+  if (process.env.APP_URL) {
+    return process.env.APP_URL.replace(/\/$/, ""); // remove trailing slash
+  }
+  // Render auto-detected
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL;
+  }
+  // Replit
   const domains = process.env.REPLIT_DOMAINS?.split(",");
   if (domains && domains.length > 0) {
     return `https://${domains[0]}`;
