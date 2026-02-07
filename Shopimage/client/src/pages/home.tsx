@@ -77,7 +77,13 @@ export default function Home() {
 
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
-      const response = await apiRequest("POST", "/api/scan", { url: domain });
+      const response = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: domain }),
+        credentials: "include",
+      });
+      
       const data = await response.json();
       
       // Check if needs install
