@@ -277,10 +277,22 @@ export default function Home() {
         });
         return;
       }
-      toast({
-        title: "Connecting...",
-        description: "Store connection feature coming soon!",
-      });
+      
+      // Normalize the store URL to get the myshopify.com domain
+      let shop = storeUrl.trim().toLowerCase();
+      // Remove protocol if present
+      shop = shop.replace(/^https?:\/\//, "");
+      // Remove trailing slash
+      shop = shop.replace(/\/$/, "");
+      // If it doesn't end with .myshopify.com, append it
+      if (!shop.endsWith(".myshopify.com")) {
+        // Remove any existing domain suffix
+        shop = shop.split(".")[0];
+        shop = `${shop}.myshopify.com`;
+      }
+      
+      // Redirect to install endpoint
+      window.location.href = `/api/shopify/install?shop=${encodeURIComponent(shop)}`;
     };
 
     return (
