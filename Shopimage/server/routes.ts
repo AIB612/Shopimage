@@ -660,5 +660,35 @@ export async function registerRoutes(
   app.get("/api/shopify/callback", handleCallback);
   app.get("/api/shopify/session", getShopSession);
 
+  // Admin: manually set shop token (for Custom apps)
+  app.post("/api/admin/shop-token", async (req, res) => {
+    const { domain, accessToken, adminKey } = req.body;
+    
+    // Simple admin key check
+    if (adminKey !== process.env.ADMIN_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    if (!domain || !accessToken) {
+      return res.status(400).json({ error: "Missing domain or accessToken" });
+    }
+    
+    let shop = await storage.getShopByDomain(domain);
+    if (shop) {
+      await storage.updateShopToken(shop.id, accessToken, "read_products,write_products");
+      console.log(`[Admin] Updated token for ${domain}`);
+    } else {
+      shop = await storage.createShop({
+        domain,
+        accessToken,
+        scope: "read_products,write_products",
+        lastScanAt: null,
+      });
+      console.log(`[Admin] Created shop with token: ${domain}`);
+    }
+    
+    return res.json({ success: true, shopId: shop.id });
+  });
+
   return httpServer;
 }
