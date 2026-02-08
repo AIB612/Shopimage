@@ -52,6 +52,9 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
 }> {
   const accessToken = shopAccessToken || process.env.SHOPIFY_ACCESS_TOKEN;
   
+  console.log(`[Shopify] Token source for ${domain}: ${shopAccessToken ? 'database' : 'env fallback'}`);
+  console.log(`[Shopify] Token preview: ${accessToken ? accessToken.substring(0, 10) + '...' : 'none'}`);
+  
   if (!accessToken) {
     console.log(`[Shopify] No access token for ${domain}, needs install`);
     return {
