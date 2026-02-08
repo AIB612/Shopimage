@@ -76,15 +76,15 @@ export default function Home() {
     retry: 1,
   });
 
-  // Auto-scan when returning from OAuth install
+  // Auto-scan when shop parameter is present (from OAuth or Shopify App)
   useEffect(() => {
     if (autoScanTriggered) return;
     
     const params = new URLSearchParams(window.location.search);
     const shop = params.get("shop");
-    const installed = params.get("installed");
     
-    if (shop && installed === "true") {
+    // If shop parameter exists, auto-scan (works for both OAuth callback and Shopify embedded app)
+    if (shop) {
       setAutoScanTriggered(true);
       setStoreUrl(shop);
       // Clean up URL
