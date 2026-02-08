@@ -7,11 +7,10 @@ console.log("[PayPal] Checking configuration...");
 console.log("[PayPal] CLIENT_ID exists:", !!PAYPAL_CLIENT_ID);
 console.log("[PayPal] CLIENT_SECRET exists:", !!PAYPAL_CLIENT_SECRET);
 
-// Determine environment
+// Determine environment - only use production if explicitly set to "live" or "production"
+// Default to sandbox for safety (don't auto-switch based on NODE_ENV or RENDER)
 const isProduction = process.env.PAYPAL_MODE === "live" || 
-                     process.env.PAYPAL_MODE === "production" ||
-                     process.env.RENDER === "true" ||
-                     process.env.NODE_ENV === "production";
+                     process.env.PAYPAL_MODE === "production";
 
 const PAYPAL_API_BASE = isProduction 
   ? "https://api-m.paypal.com" 
