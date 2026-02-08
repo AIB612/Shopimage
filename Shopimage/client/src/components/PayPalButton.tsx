@@ -150,6 +150,26 @@ export default function PayPalButton({
     }
   };
 
-  return <paypal-button id="paypal-button" data-testid="button-paypal"></paypal-button>;
+  return (
+    <paypal-button 
+      id="paypal-button" 
+      data-testid="button-paypal"
+      style={{
+        display: 'inline-block',
+        minWidth: '200px',
+        minHeight: '45px',
+        backgroundColor: '#0070ba',
+        color: 'white',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontSize: '16px',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        lineHeight: '45px',
+      }}
+    >
+      Pay with PayPal
+    </paypal-button>
+  );
 }
 // <END_EXACT_CODE>
