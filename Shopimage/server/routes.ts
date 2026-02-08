@@ -152,7 +152,11 @@ function calculateGrade(totalHeavyImages: number, totalSize: number): string {
   return "D";
 }
 
-// Fetch real Web Vitals using PageSpeed Insights API
+// Simple in-memory cache for PageSpeed results (1 hour TTL)
+const pageSpeedCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+// Fetch real Web Vitals using PageSpeed Insights API (with cache and retry)
 async function fetchWebVitals(domain: string): Promise<{
   lcp: number | null;  // in seconds
   inp: number | null;  // in milliseconds (using FID as proxy)
@@ -161,50 +165,89 @@ async function fetchWebVitals(domain: string): Promise<{
   status: 'good' | 'needs-improvement' | 'poor';
 }> {
   try {
+    // Check cache first
+    const cached = pageSpeedCache.get(domain);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`[PageSpeed] Using cached results for ${domain}`);
+      return cached.data;
+    }
+
     const url = `https://${domain}`;
-    const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=performance`;
+    const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;
+    let apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&strategy=mobile&category=performance`;
+    if (apiKey) {
+      apiUrl += `&key=${apiKey}`;
+    }
     
     console.log(`[PageSpeed] Fetching Web Vitals for ${domain}...`);
     
-    const response = await fetch(apiUrl, { 
-      signal: AbortSignal.timeout(30000) // 30 second timeout
-    });
-    
-    if (!response.ok) {
-      console.log(`[PageSpeed] API error: ${response.status}`);
-      return getDefaultWebVitals();
+    // Retry logic with exponential backoff
+    let lastError: any;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(apiUrl, { 
+          signal: AbortSignal.timeout(30000) // 30 second timeout
+        });
+        
+        if (response.status === 429) {
+          // Rate limited - wait and retry
+          const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          console.log(`[PageSpeed] Rate limited (429), waiting ${waitTime}ms before retry ${attempt}/3`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+        
+        if (!response.ok) {
+          console.log(`[PageSpeed] API error: ${response.status}`);
+          return getDefaultWebVitals();
+        }
+        
+        // Success - parse and cache
+        const data = await response.json() as any;
+        const result = parsePageSpeedData(data);
+        pageSpeedCache.set(domain, { data: result, timestamp: Date.now() });
+        return result;
+      } catch (err) {
+        lastError = err;
+        if (attempt < 3) {
+          const waitTime = Math.pow(2, attempt) * 1000;
+          console.log(`[PageSpeed] Attempt ${attempt} failed, retrying in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
     }
     
-    const data = await response.json() as any;
-    const metrics = data.lighthouseResult?.audits;
-    const categories = data.lighthouseResult?.categories;
-    
-    // Extract Core Web Vitals
-    const lcp = metrics?.['largest-contentful-paint']?.numericValue / 1000 || null; // Convert to seconds
-    const cls = metrics?.['cumulative-layout-shift']?.numericValue || null;
-    const inp = metrics?.['interactive']?.numericValue || null; // Using TTI as proxy for INP
-    const performanceScore = Math.round((categories?.performance?.score || 0) * 100);
-    
-    console.log(`[PageSpeed] Results - LCP: ${lcp?.toFixed(2)}s, CLS: ${cls?.toFixed(3)}, Score: ${performanceScore}`);
-    
-    // Determine overall status based on Web Vitals thresholds
-    let status: 'good' | 'needs-improvement' | 'poor' = 'good';
-    
-    if (lcp !== null) {
-      if (lcp > 4.0) status = 'poor';
-      else if (lcp > 2.5) status = 'needs-improvement';
-    }
-    
-    if (cls !== null && status !== 'poor') {
-      if (cls > 0.25) status = 'poor';
-      else if (cls > 0.1 && status === 'good') status = 'needs-improvement';
-    }
-    
-    return { lcp, inp, cls, performanceScore, status };
+    console.error('[PageSpeed] All retries failed:', lastError);
+    return getDefaultWebVitals();
   } catch (error) {
     console.error('[PageSpeed] Error fetching Web Vitals:', error);
     return getDefaultWebVitals();
   }
+}
+
+function parsePageSpeedData(data: any) {
+  const metrics = data.lighthouseResult?.audits;
+  const categories = data.lighthouseResult?.categories;
+  
+  // Extract Core Web Vitals
+  const lcp = metrics?.['largest-contentful-paint']?.numericValue / 1000 || null;
+  const cls = metrics?.['cumulative-layout-shift']?.numericValue || null;
+  const inp = metrics?.['interactive']?.numericValue || null;
+  const performanceScore = Math.round((categories?.performance?.score || 0) * 100);
+  
+  console.log(`[PageSpeed] Results - LCP: ${lcp?.toFixed(2)}s, CLS: ${cls?.toFixed(3)}, Score: ${performanceScore}`);
+  
+  let status: 'good' | 'needs-improvement' | 'poor' = 'good';
+  if (lcp !== null) {
+    if (lcp > 4.0) status = 'poor';
+    else if (lcp > 2.5) status = 'needs-improvement';
+  }
+  if (cls !== null && status !== 'poor') {
+    if (cls > 0.25) status = 'poor';
+    else if (cls > 0.1 && status === 'good') status = 'needs-improvement';
+  }
+  
+  return { lcp, inp, cls, performanceScore, status };
 }
 
 function getDefaultWebVitals() {
