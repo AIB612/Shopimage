@@ -38,13 +38,14 @@ class MemoryStorage implements IStorage {
     const newShop: Shop = {
       id,
       domain: shop.domain,
-      accessToken: null,
-      scope: null,
+      accessToken: shop.accessToken || null,
+      scope: shop.scope || null,
       isPro: 0,
       lastScanAt: shop.lastScanAt || null,
       createdAt: new Date(),
     };
     this.shops.set(id, newShop);
+    console.log("[MemoryStorage] Created shop:", newShop.domain, "with token:", newShop.accessToken ? "***" : "null");
     return newShop;
   }
 
