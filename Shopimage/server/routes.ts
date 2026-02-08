@@ -91,6 +91,10 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
 
     const data = await response.json() as { products: ShopifyProduct[] };
     const products = data.products || [];
+    console.log(`[Shopify] API returned ${products.length} products for ${domain}`);
+    if (products.length > 0) {
+      console.log(`[Shopify] First product: ${products[0].title}, images: ${products[0].images?.length || 0}`);
+    }
     const allImages: any[] = [];
 
     for (const product of products) {
