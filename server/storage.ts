@@ -1,13 +1,20 @@
 import { db } from "./db";
 import { shops, imageLogs, type Shop, type InsertShop, type ImageLog, type InsertImageLog } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+
+type PlanType = "free" | "basic" | "pro";
+type SubscriptionStatus = "active" | "cancelled" | "expired" | "pending";
 
 export interface IStorage {
   getShopByDomain(domain: string): Promise<Shop | undefined>;
+  getShopById(id: string): Promise<Shop | undefined>;
   createShop(shop: InsertShop): Promise<Shop>;
   updateShopScanTime(id: string): Promise<void>;
   updateShopToken(id: string, accessToken: string, scope: string): Promise<void>;
   updateShopProStatus(id: string, isPro: boolean): Promise<void>;
+  updateShopPlan(id: string, plan: PlanType, subscriptionId: string | null, status?: SubscriptionStatus): Promise<void>;
+  incrementShopUsage(id: string): Promise<void>;
+  resetShopUsage(id: string): Promise<void>;
   getImageLogsByShopId(shopId: string): Promise<ImageLog[]>;
   createImageLog(imageLog: InsertImageLog): Promise<ImageLog>;
   updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog>;
@@ -18,6 +25,11 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getShopByDomain(domain: string): Promise<Shop | undefined> {
     const result = await db.select().from(shops).where(eq(shops.domain, domain)).limit(1);
+    return result[0];
+  }
+
+  async getShopById(id: string): Promise<Shop | undefined> {
+    const result = await db.select().from(shops).where(eq(shops.id, id)).limit(1);
     return result[0];
   }
 
@@ -36,6 +48,33 @@ export class DatabaseStorage implements IStorage {
 
   async updateShopProStatus(id: string, isPro: boolean): Promise<void> {
     await db.update(shops).set({ isPro: isPro ? 1 : 0 }).where(eq(shops.id, id));
+  }
+
+  async updateShopPlan(
+    id: string, 
+    plan: PlanType, 
+    subscriptionId: string | null, 
+    status: SubscriptionStatus = "active"
+  ): Promise<void> {
+    await db.update(shops).set({ 
+      plan, 
+      subscriptionId, 
+      subscriptionStatus: status,
+      isPro: plan !== "free" ? 1 : 0,
+    }).where(eq(shops.id, id));
+  }
+
+  async incrementShopUsage(id: string): Promise<void> {
+    await db.update(shops).set({ 
+      imagesOptimizedThisMonth: sql`COALESCE(${shops.imagesOptimizedThisMonth}, 0) + 1`
+    }).where(eq(shops.id, id));
+  }
+
+  async resetShopUsage(id: string): Promise<void> {
+    await db.update(shops).set({ 
+      imagesOptimizedThisMonth: 0,
+      usageResetAt: new Date(),
+    }).where(eq(shops.id, id));
   }
 
   async getImageLogsByShopId(shopId: string): Promise<ImageLog[]> {

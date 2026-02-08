@@ -5,6 +5,15 @@ import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal_service";
 import { handleInstall, handleCallback, getShopSession } from "./shopify";
+import { 
+  handleGetPlans, 
+  handleSubscribe, 
+  handleBillingCallback, 
+  handleCancelSubscription, 
+  handleBillingStatus,
+  checkUsageLimit,
+  incrementUsage 
+} from "./billing";
 
 const scanRequestSchema = z.object({
   url: z.string().url().or(z.string().min(1)),
@@ -315,9 +324,22 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Image already optimized" });
       }
 
+      // Check usage limit
+      const { allowed, remaining } = await checkUsageLimit(imageLog.shopId);
+      if (!allowed) {
+        return res.status(403).json({ 
+          message: "Monthly image limit reached. Please upgrade your plan.",
+          code: "USAGE_LIMIT_EXCEEDED",
+          remaining: 0,
+        });
+      }
+
       const optimizedSize = Math.round(imageLog.originalSize * 0.2);
       
       const updated = await storage.updateImageLogStatus(id, "optimized", optimizedSize);
+      
+      // Increment usage counter
+      await incrementUsage(imageLog.shopId);
       
       return res.json(updated);
     } catch (error) {
@@ -331,23 +353,47 @@ export async function registerRoutes(
     try {
       const { shopId } = req.params;
       
+      // Check usage limit first
+      const { allowed, remaining } = await checkUsageLimit(shopId);
+      if (!allowed) {
+        return res.status(403).json({ 
+          message: "Monthly image limit reached. Please upgrade your plan.",
+          code: "USAGE_LIMIT_EXCEEDED",
+          remaining: 0,
+        });
+      }
+      
       const images = await storage.getImageLogsByShopId(shopId);
       const pendingImages = images.filter(img => img.status === "pending");
+      
+      // Limit to remaining quota (for non-unlimited plans)
+      const imagesToOptimize = remaining === -1 
+        ? pendingImages 
+        : pendingImages.slice(0, remaining);
       
       const optimizedImages: ImageLog[] = [];
       let totalSaved = 0;
       
-      for (const img of pendingImages) {
+      for (const img of imagesToOptimize) {
         const optimizedSize = Math.round(img.originalSize * 0.2);
         const updated = await storage.updateImageLogStatus(img.id, "optimized", optimizedSize);
         optimizedImages.push(updated);
         totalSaved += img.originalSize - optimizedSize;
+        
+        // Increment usage for each image
+        await incrementUsage(shopId);
       }
+      
+      const skipped = pendingImages.length - imagesToOptimize.length;
       
       return res.json({
         optimizedCount: optimizedImages.length,
+        skippedCount: skipped,
         totalSaved,
         images: optimizedImages,
+        message: skipped > 0 
+          ? `Optimized ${optimizedImages.length} images. ${skipped} images skipped due to plan limit.`
+          : undefined,
       });
     } catch (error) {
       console.error("Batch optimize error:", error);
@@ -437,6 +483,27 @@ export async function registerRoutes(
 
   app.get("/api/shopify/session", async (req, res) => {
     await getShopSession(req, res);
+  });
+
+  // Billing routes
+  app.get("/api/billing/plans", async (req, res) => {
+    await handleGetPlans(req, res);
+  });
+
+  app.post("/api/billing/subscribe", async (req, res) => {
+    await handleSubscribe(req, res);
+  });
+
+  app.get("/api/billing/callback", async (req, res) => {
+    await handleBillingCallback(req, res);
+  });
+
+  app.post("/api/billing/cancel", async (req, res) => {
+    await handleCancelSubscription(req, res);
+  });
+
+  app.get("/api/billing/status", async (req, res) => {
+    await handleBillingStatus(req, res);
   });
 
   return httpServer;
