@@ -24,6 +24,21 @@ interface ShopInfo {
   spaceSaved: number;
 }
 
+interface BillingStatus {
+  plan: string;
+  planName: string;
+  imagesPerMonth: number;
+  usage: {
+    imagesOptimized: number;
+    limit: number;
+    remaining: number;
+  };
+  subscription: {
+    active: boolean;
+    id: string | null;
+  };
+}
+
 type AppState = "unauthorized" | "loading" | "ready" | "scanning" | "complete";
 
 interface ScanStatus {
@@ -47,15 +62,31 @@ export default function Home() {
   const [images, setImages] = useState<ImageAnalysis[]>([]);
   const [fixCount, setFixCount] = useState(0);
   const [isSynced, setIsSynced] = useState(false);
-  const [isProUser, setIsProUser] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
 
   // Get shop from URL params
   const urlParams = new URLSearchParams(window.location.search);
   const shopFromUrl = urlParams.get("shop");
+
+  // Fetch billing status
+  const billingQuery = useQuery<BillingStatus>({
+    queryKey: ["/api/billing/status", shopFromUrl],
+    queryFn: async () => {
+      const response = await fetch(`/api/billing/status?shop=${encodeURIComponent(shopFromUrl || "")}`);
+      if (!response.ok) throw new Error("Failed to fetch billing status");
+      return response.json();
+    },
+    enabled: !!shopFromUrl,
+    refetchOnWindowFocus: false,
+  });
+
+  const isProUser = billingQuery.data?.plan === "pro";
+  const isBasicUser = billingQuery.data?.plan === "basic";
+  const isPaidUser = isProUser || isBasicUser;
+  const usageLimit = billingQuery.data?.usage.limit || 10;
+  const usageRemaining = billingQuery.data?.usage.remaining ?? usageLimit;
 
   // Fetch shop info automatically
   const shopInfoQuery = useQuery<ShopInfo>({
@@ -164,6 +195,11 @@ export default function Home() {
     mutationFn: async (imageId: string) => {
       const response = await apiRequest("POST", `/api/images/${imageId}/fix`);
       const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || "Failed to optimize") as Error & { code?: string };
+        (error as any).code = data.code;
+        throw error;
+      }
       return data;
     },
     onSuccess: (data, imageId) => {
@@ -174,36 +210,84 @@ export default function Home() {
       ));
       setFixCount(prev => prev + 1);
       queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
       toast({
         title: "Image Optimized!",
         description: `Saved ${formatBytes(data.originalSize - data.optimizedSize)}`,
       });
     },
-    onError: () => {
-      toast({
-        title: "Optimization Failed",
-        description: "Failed to optimize the image.",
-        variant: "destructive",
-      });
+    onError: (error: Error & { code?: string }) => {
+      if (error.code === "USAGE_LIMIT_EXCEEDED") {
+        setShowUpgradeModal(true);
+        toast({
+          title: "Usage Limit Reached",
+          description: "Upgrade your plan to optimize more images.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Optimization Failed",
+          description: error.message || "Failed to optimize the image.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
   const optimizeAllMutation = useMutation({
     mutationFn: async (shopId: string) => {
       const response = await apiRequest("POST", `/api/shops/${shopId}/optimize-all`);
-      return response.json();
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || "Failed to optimize") as Error & { code?: string };
+        (error as any).code = data.code;
+        throw error;
+      }
+      return data;
     },
     onSuccess: (data) => {
-      setImages(prev => prev.map(img => ({
-        ...img,
-        status: "optimized" as const,
-        estimatedOptimizedSize: Math.round(img.originalSize * 0.2),
-      })));
+      // Only update images that were actually optimized
+      if (data.optimizedCount > 0) {
+        setImages(prev => {
+          const optimizedIds = new Set(data.images?.map((img: any) => img.id) || []);
+          return prev.map(img => 
+            optimizedIds.has(img.id) 
+              ? { ...img, status: "optimized" as const, estimatedOptimizedSize: Math.round(img.originalSize * 0.2) }
+              : img
+          );
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
-      toast({
-        title: "All Images Optimized!",
-        description: `Successfully optimized ${data.optimizedCount} images`,
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
+      
+      if (data.skippedCount > 0) {
+        toast({
+          title: "Optimization Complete",
+          description: data.message || `Optimized ${data.optimizedCount} images. ${data.skippedCount} skipped due to plan limit.`,
+        });
+        setShowUpgradeModal(true);
+      } else {
+        toast({
+          title: "All Images Optimized!",
+          description: `Successfully optimized ${data.optimizedCount} images`,
+        });
+      }
+    },
+    onError: (error: Error & { code?: string }) => {
+      if (error.code === "USAGE_LIMIT_EXCEEDED") {
+        setShowUpgradeModal(true);
+        toast({
+          title: "Usage Limit Reached",
+          description: "Upgrade your plan to optimize more images.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Optimization Failed",
+          description: error.message || "Failed to optimize images.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -222,11 +306,11 @@ export default function Home() {
   });
 
   const handleFix = (imageId: string) => {
-    if (!isProUser && fixCount >= FREE_IMAGE_LIMIT) {
+    // Check usage limit (Pro users have unlimited = -1)
+    if (!isProUser && usageRemaining <= 0) {
       setShowUpgradeModal(true);
       return;
     }
-    // Pro users have unlimited access
     fixMutation.mutate(imageId);
   };
 
@@ -493,6 +577,28 @@ export default function Home() {
   const shopInfo = shopInfoQuery.data;
   const latencyStatus = getLatencyStatus(shopInfo?.speedMetrics.latency || 0);
 
+  // Format usage display
+  const getUsageDisplay = () => {
+    if (!billingQuery.data) return "Loading...";
+    const { plan, usage } = billingQuery.data;
+    if (plan === "pro") {
+      return `${usage.imagesOptimized} optimized (unlimited)`;
+    }
+    return `${usage.imagesOptimized}/${usage.limit} images`;
+  };
+
+  const getPlanBadge = () => {
+    if (!billingQuery.data) return null;
+    const { plan, planName } = billingQuery.data;
+    if (plan === "pro") {
+      return <Badge className="bg-primary text-primary-foreground text-xs gap-1"><Crown className="w-3 h-3" />{planName}</Badge>;
+    }
+    if (plan === "basic") {
+      return <Badge className="bg-blue-500 text-white text-xs">{planName}</Badge>;
+    }
+    return <Badge variant="secondary" className="text-xs">{planName}</Badge>;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -507,9 +613,23 @@ export default function Home() {
               <p className="text-xs text-muted-foreground">Optimize your store images</p>
             </div>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {isProUser ? `${fixCount} optimized (unlimited)` : `${Math.min(fixCount, FREE_IMAGE_LIMIT)}/${FREE_IMAGE_LIMIT} free`}
-          </Badge>
+          <div className="flex items-center gap-3">
+            {getPlanBadge()}
+            <Badge variant="outline" className="text-xs">
+              {getUsageDisplay()}
+            </Badge>
+            {!isProUser && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs gap-1"
+                onClick={() => setShowUpgradeModal(true)}
+              >
+                <Crown className="w-3 h-3" />
+                Upgrade
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -743,36 +863,37 @@ export default function Home() {
                     <h3 className="text-lg font-semibold text-foreground">Images to Optimize</h3>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{images.length} images</Badge>
-                      {!isProUser && images.length > FREE_IMAGE_LIMIT && (
+                      {!isProUser && usageRemaining < images.filter(img => img.status === "pending").length && (
                         <Badge variant="outline" className="text-primary border-primary">
                           <Lock className="w-3 h-3 mr-1" />
-                          {images.length - FREE_IMAGE_LIMIT} locked
+                          {Math.max(0, pendingCount - usageRemaining)} need upgrade
                         </Badge>
                       )}
                     </div>
                   </div>
                   <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                    {(isProUser ? images : images.slice(0, FREE_IMAGE_LIMIT)).map((image, index) => (
+                    {images.map((image, index) => (
                       <ImageResultCard
                         key={image.id}
                         image={image}
                         onFix={() => handleFix(image.id)}
                         isFixing={fixMutation.isPending && fixMutation.variables === image.id}
                         index={index}
+                        isLocked={!isProUser && image.status === "pending" && usageRemaining <= 0}
                       />
                     ))}
                     
-                    {/* Unlock More Section */}
-                    {!isProUser && images.length > FREE_IMAGE_LIMIT && (
+                    {/* Upgrade Section - Show when usage limit reached */}
+                    {!isProUser && usageRemaining <= 0 && pendingCount > 0 && (
                       <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                         <div className="text-center space-y-4">
                           <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
                             <Crown className="w-6 h-6 text-primary" />
                           </div>
                           <div>
-                            <h4 className="font-semibold text-foreground">Unlock {images.length - FREE_IMAGE_LIMIT} More Images</h4>
+                            <h4 className="font-semibold text-foreground">Monthly Limit Reached</h4>
                             <p className="text-sm text-muted-foreground mt-1">
-                              Upgrade to Pro for unlimited image optimization
+                              Upgrade your plan to optimize {pendingCount} more images
                             </p>
                           </div>
                           <Button 
@@ -781,10 +902,10 @@ export default function Home() {
                             data-testid="button-upgrade"
                           >
                             <Crown className="w-4 h-4" />
-                            Upgrade to Pro
+                            View Plans
                           </Button>
                           <p className="text-xs text-muted-foreground">
-                            Free: {FREE_IMAGE_LIMIT} images/scan | Pro: Unlimited
+                            {billingQuery.data?.planName || "Free"}: {usageLimit} images/month | Pro: Unlimited
                           </p>
                         </div>
                       </Card>
@@ -815,7 +936,8 @@ export default function Home() {
         open={showUpgradeModal} 
         onClose={() => setShowUpgradeModal(false)}
         onSuccess={() => {
-          setIsProUser(true);
+          // Refetch billing status to update plan
+          queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
           setShowUpgradeModal(false);
         }}
       />

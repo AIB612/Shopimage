@@ -79,7 +79,7 @@ function verifyTimestamp(timestamp: string): boolean {
 function storeNonce(nonce: string, shop: string): void {
   nonceStore.set(nonce, { shop, createdAt: Date.now() });
   
-  for (const [key, value] of nonceStore.entries()) {
+  for (const [key, value] of Array.from(nonceStore.entries())) {
     if (Date.now() - value.createdAt > NONCE_EXPIRY_MS) {
       nonceStore.delete(key);
     }

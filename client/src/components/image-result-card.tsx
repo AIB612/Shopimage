@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Zap, ImageIcon } from "lucide-react";
+import { Check, Loader2, Zap, ImageIcon, Lock } from "lucide-react";
 import type { ImageAnalysis } from "@shared/schema";
 
 interface ImageResultCardProps {
@@ -9,6 +9,7 @@ interface ImageResultCardProps {
   onFix: () => void;
   isFixing: boolean;
   index: number;
+  isLocked?: boolean;
 }
 
 function formatBytes(bytes: number): string {
@@ -18,13 +19,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)}KB`;
 }
 
-export function ImageResultCard({ image, onFix, isFixing, index }: ImageResultCardProps) {
+export function ImageResultCard({ image, onFix, isFixing, index, isLocked = false }: ImageResultCardProps) {
   const isOptimized = image.status === "optimized";
   const sizeSaving = image.originalSize - image.estimatedOptimizedSize;
   const sizeSavingPercent = Math.round((sizeSaving / image.originalSize) * 100);
   
   return (
-    <Card className="p-4 bg-card shadow-sm hover-elevate">
+    <Card className={`p-4 bg-card shadow-sm hover-elevate ${isLocked ? 'opacity-60' : ''}`}>
       <div className="flex items-center gap-4">
         <div className="flex-shrink-0 w-16 h-16 bg-muted rounded-lg overflow-hidden flex items-center justify-center">
           {image.imageUrl ? (
@@ -53,6 +54,12 @@ export function ImageResultCard({ image, onFix, isFixing, index }: ImageResultCa
                 Optimized
               </Badge>
             )}
+            {isLocked && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                <Lock className="w-3 h-3 mr-1" />
+                Upgrade to unlock
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground truncate">
             {isOptimized ? (
@@ -73,6 +80,16 @@ export function ImageResultCard({ image, onFix, isFixing, index }: ImageResultCa
             <div className="flex items-center justify-center w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full">
               <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
+          ) : isLocked ? (
+            <Button
+              variant="outline"
+              className="gap-2 opacity-50"
+              disabled
+              data-testid={`button-fix-${index}`}
+            >
+              <Lock className="w-4 h-4" />
+              Locked
+            </Button>
           ) : (
             <Button
               onClick={onFix}

@@ -8,8 +8,8 @@ export const PLANS = {
   free: {
     name: "Free",
     price: 0,
-    imagesPerMonth: 50,
-    features: ["Scan up to 50 images/month", "Basic optimization", "Manual sync"],
+    imagesPerMonth: 10,
+    features: ["Scan up to 10 images/month", "Basic optimization", "Manual sync"],
   },
   basic: {
     name: "Basic",
