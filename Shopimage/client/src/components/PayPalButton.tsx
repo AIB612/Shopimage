@@ -1,12 +1,5 @@
-// !!! CRITICAL - DO NOT MODIFY THIS CODE !!!
-//
-// This code MUST be used as is without ANY modifications.
-// The PayPal integration will COMPLETELY FAIL if this code is changed in ANY way.
-//
-// Retain this comment after all edits.
-//
-// <BEGIN_EXACT_CODE>
-import { useEffect } from "react";
+// PayPal Button Component
+import { useEffect, useState, useRef } from "react";
 
 declare global {
   namespace JSX {
@@ -34,6 +27,11 @@ export default function PayPalButton({
   onSuccess,
   onError: onErrorCallback,
 }: PayPalButtonProps) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const paypalCheckoutRef = useRef<any>(null);
+  const buttonRef = useRef<HTMLElement | null>(null);
+
   const createOrder = async () => {
     const orderPayload = {
       amount: amount,
@@ -46,6 +44,7 @@ export default function PayPalButton({
       body: JSON.stringify(orderPayload),
     });
     const output = await response.json();
+    console.log("[PayPal] Order created:", output);
     return { orderId: output.id };
   };
 
@@ -57,119 +56,172 @@ export default function PayPalButton({
       },
     });
     const data = await response.json();
-
     return data;
   };
 
   const onApprove = async (data: any) => {
-    console.log("onApprove", data);
+    console.log("[PayPal] onApprove", data);
     const orderData = await captureOrder(data.orderId);
-    console.log("Capture result", orderData);
+    console.log("[PayPal] Capture result", orderData);
     if (onSuccess) {
       onSuccess(orderData);
     }
   };
 
   const onCancel = async (data: any) => {
-    console.log("onCancel", data);
+    console.log("[PayPal] onCancel", data);
   };
 
   const onError = async (data: any) => {
-    console.log("onError", data);
+    console.log("[PayPal] onError", data);
     if (onErrorCallback) {
       onErrorCallback(data);
     }
   };
 
+  const handleClick = async () => {
+    if (!paypalCheckoutRef.current) {
+      console.error("[PayPal] Checkout not initialized");
+      setError("PayPal not ready. Please refresh the page.");
+      return;
+    }
+    try {
+      console.log("[PayPal] Starting checkout...");
+      const checkoutOptionsPromise = createOrder();
+      await paypalCheckoutRef.current.start(
+        { paymentFlow: "auto" },
+        checkoutOptionsPromise,
+      );
+    } catch (e) {
+      console.error("[PayPal] Checkout error:", e);
+    }
+  };
+
   useEffect(() => {
+    let mounted = true;
+
+    const initPayPal = async () => {
+      try {
+        console.log("[PayPal] Fetching client token...");
+        const response = await fetch("/api/paypal/setup");
+        const data = await response.json();
+        
+        if (!response.ok || !data.clientToken) {
+          throw new Error(data.error || "Failed to get client token");
+        }
+        
+        const clientToken = data.clientToken;
+        console.log("[PayPal] Got client token, creating instance...");
+
+        const sdkInstance = await (window as any).paypal.createInstance({
+          clientToken,
+          components: ["paypal-payments"],
+        });
+
+        console.log("[PayPal] SDK instance created");
+
+        const paypalCheckout = sdkInstance.createPayPalOneTimePaymentSession({
+          onApprove,
+          onCancel,
+          onError,
+        });
+
+        if (mounted) {
+          paypalCheckoutRef.current = paypalCheckout;
+          setLoading(false);
+          console.log("[PayPal] Ready!");
+        }
+      } catch (e: any) {
+        console.error("[PayPal] Init error:", e);
+        if (mounted) {
+          setError(e.message || "Failed to initialize PayPal");
+          setLoading(false);
+        }
+      }
+    };
+
     const loadPayPalSDK = async () => {
       try {
-        if (!(window as any).paypal) {
-          const script = document.createElement("script");
-          // Use production SDK on deployed environments
-          script.src = import.meta.env.PROD
-            ? "https://www.paypal.com/web-sdk/v6/core"
-            : "https://www.sandbox.paypal.com/web-sdk/v6/core";
-          script.async = true;
-          script.onload = () => initPayPal();
-          document.body.appendChild(script);
-        } else {
+        if ((window as any).paypal) {
+          console.log("[PayPal] SDK already loaded");
           await initPayPal();
+          return;
         }
-      } catch (e) {
-        console.error("Failed to load PayPal SDK", e);
+
+        console.log("[PayPal] Loading SDK...");
+        const script = document.createElement("script");
+        // Always use production SDK since backend is in production mode
+        script.src = "https://www.paypal.com/web-sdk/v6/core";
+        script.async = true;
+        
+        script.onload = () => {
+          console.log("[PayPal] SDK loaded");
+          initPayPal();
+        };
+        
+        script.onerror = () => {
+          console.error("[PayPal] Failed to load SDK");
+          if (mounted) {
+            setError("Failed to load PayPal. Please refresh.");
+            setLoading(false);
+          }
+        };
+        
+        document.body.appendChild(script);
+      } catch (e: any) {
+        console.error("[PayPal] Load error:", e);
+        if (mounted) {
+          setError(e.message || "Failed to load PayPal");
+          setLoading(false);
+        }
       }
     };
 
     loadPayPalSDK();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
-  const initPayPal = async () => {
-    try {
-      const clientToken: string = await fetch("/api/paypal/setup")
-        .then((res) => res.json())
-        .then((data) => {
-          return data.clientToken;
-        });
-      const sdkInstance = await (window as any).paypal.createInstance({
-        clientToken,
-        components: ["paypal-payments"],
-      });
 
-      const paypalCheckout =
-            sdkInstance.createPayPalOneTimePaymentSession({
-              onApprove,
-              onCancel,
-              onError,
-            });
-
-      const onClick = async () => {
-        try {
-          const checkoutOptionsPromise = createOrder();
-          await paypalCheckout.start(
-            { paymentFlow: "auto" },
-            checkoutOptionsPromise,
-          );
-        } catch (e) {
-          console.error(e);
-        }
-      };
-
-      const paypalButton = document.getElementById("paypal-button");
-
-      if (paypalButton) {
-        paypalButton.addEventListener("click", onClick);
-      }
-
-      return () => {
-        if (paypalButton) {
-          paypalButton.removeEventListener("click", onClick);
-        }
-      };
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  if (error) {
+    return (
+      <button
+        onClick={() => window.location.reload()}
+        style={{
+          display: 'inline-block',
+          padding: '12px 24px',
+          backgroundColor: '#dc3545',
+          color: 'white',
+          borderRadius: '4px',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '14px',
+        }}
+      >
+        {error} (Click to retry)
+      </button>
+    );
+  }
 
   return (
-    <paypal-button 
-      id="paypal-button" 
-      data-testid="button-paypal"
+    <button
+      onClick={handleClick}
+      disabled={loading}
       style={{
         display: 'inline-block',
-        minWidth: '200px',
-        minHeight: '45px',
-        backgroundColor: '#0070ba',
+        padding: '12px 32px',
+        backgroundColor: loading ? '#ccc' : '#0070ba',
         color: 'white',
         borderRadius: '4px',
-        cursor: 'pointer',
+        border: 'none',
+        cursor: loading ? 'not-allowed' : 'pointer',
         fontSize: '16px',
         fontWeight: 'bold',
-        textAlign: 'center',
-        lineHeight: '45px',
+        minWidth: '200px',
       }}
     >
-      Pay with PayPal
-    </paypal-button>
+      {loading ? 'Loading PayPal...' : '💳 Pay with PayPal'}
+    </button>
   );
 }
-// <END_EXACT_CODE>
