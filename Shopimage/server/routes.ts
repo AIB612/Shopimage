@@ -378,6 +378,7 @@ export async function registerRoutes(
         const log = await storage.createImageLog({
           shopId: shop.id,
           shopifyAssetId: img.shopifyAssetId,
+          shopifyProductId: img.shopifyProductId || null,
           imageUrl: img.imageUrl,
           imageName: img.imageName,
           originalSize: img.originalSize,
