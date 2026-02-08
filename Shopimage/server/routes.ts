@@ -694,9 +694,110 @@ export async function registerRoutes(
   });
 
   // GDPR mandatory webhooks (Shopify requirement)
-  app.post("/api/webhooks/customers/data_request", (req, res) => res.status(200).send());
-  app.post("/api/webhooks/customers/redact", (req, res) => res.status(200).send());
-  app.post("/api/webhooks/shop/redact", (req, res) => res.status(200).send());
+  // These webhooks must verify HMAC signature from Shopify
+  
+  const crypto = require('crypto');
+  
+  function verifyShopifyWebhook(req: any): boolean {
+    const hmacHeader = req.get('X-Shopify-Hmac-Sha256');
+    if (!hmacHeader) {
+      console.log('[Webhook] Missing HMAC header');
+      return false;
+    }
+    
+    const secret = process.env.SHOPIFY_API_SECRET;
+    if (!secret) {
+      console.log('[Webhook] Missing SHOPIFY_API_SECRET');
+      return false;
+    }
+    
+    // Get raw body - need to ensure express.raw() middleware is used for webhooks
+    const rawBody = req.rawBody || JSON.stringify(req.body);
+    const hash = crypto
+      .createHmac('sha256', secret)
+      .update(rawBody, 'utf8')
+      .digest('base64');
+    
+    const valid = crypto.timingSafeEqual(
+      Buffer.from(hash),
+      Buffer.from(hmacHeader)
+    );
+    
+    console.log(`[Webhook] HMAC verification: ${valid ? 'PASSED' : 'FAILED'}`);
+    return valid;
+  }
+
+  // Customer data request - respond with customer data if we have any
+  app.post("/api/webhooks/customers/data_request", async (req, res) => {
+    console.log('[Webhook] Received customers/data_request');
+    
+    // Verify HMAC (optional in dev, required in production)
+    if (process.env.NODE_ENV === 'production' && !verifyShopifyWebhook(req)) {
+      return res.status(401).json({ error: 'Invalid HMAC signature' });
+    }
+    
+    const { shop_domain, customer } = req.body;
+    console.log(`[Webhook] Data request for customer ${customer?.id} from ${shop_domain}`);
+    
+    // We don't store customer PII, so just acknowledge
+    // In a real app, you would gather and return customer data
+    return res.status(200).json({ 
+      message: 'Data request received',
+      data_stored: false 
+    });
+  });
+
+  // Customer redact - delete customer data
+  app.post("/api/webhooks/customers/redact", async (req, res) => {
+    console.log('[Webhook] Received customers/redact');
+    
+    if (process.env.NODE_ENV === 'production' && !verifyShopifyWebhook(req)) {
+      return res.status(401).json({ error: 'Invalid HMAC signature' });
+    }
+    
+    const { shop_domain, customer } = req.body;
+    console.log(`[Webhook] Redact customer ${customer?.id} from ${shop_domain}`);
+    
+    // We don't store customer PII, so just acknowledge
+    // In a real app, you would delete customer data here
+    return res.status(200).json({ 
+      message: 'Customer data redacted',
+      deleted: true 
+    });
+  });
+
+  // Shop redact - delete all shop data after uninstall
+  app.post("/api/webhooks/shop/redact", async (req, res) => {
+    console.log('[Webhook] Received shop/redact');
+    
+    if (process.env.NODE_ENV === 'production' && !verifyShopifyWebhook(req)) {
+      return res.status(401).json({ error: 'Invalid HMAC signature' });
+    }
+    
+    const { shop_domain } = req.body;
+    console.log(`[Webhook] Redact shop data for ${shop_domain}`);
+    
+    try {
+      // Delete shop and all associated data
+      const shop = await storage.getShopByDomain(shop_domain);
+      if (shop) {
+        await storage.deleteImageLogsByShopId(shop.id);
+        await storage.deleteShop(shop.id);
+        console.log(`[Webhook] Deleted all data for shop ${shop_domain}`);
+      }
+      
+      return res.status(200).json({ 
+        message: 'Shop data redacted',
+        deleted: true 
+      });
+    } catch (error) {
+      console.error('[Webhook] Error redacting shop:', error);
+      return res.status(200).json({ 
+        message: 'Shop data redaction attempted',
+        error: String(error)
+      });
+    }
+  });
 
   // PayPal routes
   app.get("/api/paypal/setup", loadPaypalDefault);

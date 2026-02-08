@@ -13,6 +13,7 @@ export interface IStorage {
   updateImageLogSyncStatus(id: string, syncStatus: "synced" | "pending"): Promise<ImageLog>;
   getImageLogById(id: string): Promise<ImageLog | undefined>;
   deleteImageLogsByShopId(shopId: string): Promise<void>;
+  deleteShop(id: string): Promise<void>;
 }
 
 // In-memory storage for demo mode
@@ -129,6 +130,10 @@ class MemoryStorage implements IStorage {
       if (log.shopId === shopId) this.imageLogs.delete(id);
     }
   }
+
+  async deleteShop(id: string): Promise<void> {
+    this.shops.delete(id);
+  }
 }
 
 // Database storage for production (when DATABASE_URL is set)
@@ -220,6 +225,10 @@ class DatabaseStorage implements IStorage {
 
   async deleteImageLogsByShopId(shopId: string): Promise<void> {
     await this.db.delete(this.imageLogs).where(this.eq(this.imageLogs.shopId, shopId));
+  }
+
+  async deleteShop(id: string): Promise<void> {
+    await this.db.delete(this.shops).where(this.eq(this.shops.id, id));
   }
 }
 
