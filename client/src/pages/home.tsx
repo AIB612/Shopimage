@@ -85,7 +85,7 @@ export default function Home() {
   const isProUser = billingQuery.data?.plan === "pro";
   const isBasicUser = billingQuery.data?.plan === "basic";
   const isPaidUser = isProUser || isBasicUser;
-  const usageLimit = billingQuery.data?.usage.limit || 10;
+  const usageLimit = billingQuery.data?.usage.limit || 5;
   const usageRemaining = billingQuery.data?.usage.remaining ?? usageLimit;
 
   // Fetch shop info automatically
