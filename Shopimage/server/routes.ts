@@ -40,6 +40,7 @@ interface ShopifyProduct {
 async function fetchShopifyProducts(domain: string, shopAccessToken?: string | null): Promise<{
   needsInstall: boolean;
   installUrl?: string;
+  error?: string;
   images: Array<{
     imageUrl: string;
     imageName: string;
@@ -73,15 +74,19 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[Shopify] API error for ${domain}:`, response.status, errorText);
-      // Token might be invalid, needs reinstall
-      if (response.status === 401 || response.status === 403) {
+      // Only 401 means token is invalid and needs reinstall
+      // 403 usually means Protected Customer Data policy - app needs approval, not reinstall
+      if (response.status === 401) {
         return {
           needsInstall: true,
           installUrl: `/api/shopify/install?shop=${encodeURIComponent(domain)}`,
           images: []
         };
       }
-      return { needsInstall: false, images: [] };
+      // For 403 and other errors, return empty but don't ask for reinstall
+      // This prevents infinite redirect loops
+      console.log(`[Shopify] API returned ${response.status} - may need Protected Customer Data approval in Shopify Partners`);
+      return { needsInstall: false, images: [], error: `API error: ${response.status}` };
     }
 
     const data = await response.json() as { products: ShopifyProduct[] };
