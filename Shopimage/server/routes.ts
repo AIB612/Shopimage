@@ -100,19 +100,66 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
     }
     const allImages: any[] = [];
 
+    // Helper function to get real file size via HEAD request
+    async function getRealFileSize(url: string): Promise<number | null> {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        const contentLength = response.headers.get('content-length');
+        if (contentLength) {
+          return parseInt(contentLength, 10);
+        }
+      } catch (e) {
+        console.log(`[Shopify] Failed to get file size for ${url}`);
+      }
+      return null;
+    }
+
+    // Collect all image info first
+    const imageInfos: Array<{
+      src: string;
+      productTitle: string;
+      imageId: number;
+      format: string;
+      width?: number;
+      height?: number;
+      productId: number;
+    }> = [];
+
     for (const product of products) {
       for (const image of product.images) {
         const format = image.src.toLowerCase().includes(".png") ? "PNG" : "JPG";
-        const estimatedSize = (image.width || 800) * (image.height || 800) * (format === "PNG" ? 4 : 3) * 0.15;
-        allImages.push({
-          imageUrl: image.src,
-          imageName: `${product.title.substring(0, 30)}_${image.id}.${format.toLowerCase()}`,
-          originalSize: Math.round(estimatedSize),
+        imageInfos.push({
+          src: image.src,
+          productTitle: product.title,
+          imageId: image.id,
           format,
-          shopifyAssetId: `gid://shopify/ProductImage/${image.id}`,
-          shopifyProductId: `${product.id}`,
+          width: image.width,
+          height: image.height,
+          productId: product.id,
         });
       }
+    }
+
+    // Fetch real file sizes in parallel (batch of 10 at a time to avoid overwhelming)
+    const batchSize = 10;
+    for (let i = 0; i < imageInfos.length; i += batchSize) {
+      const batch = imageInfos.slice(i, i + batchSize);
+      const sizes = await Promise.all(batch.map(info => getRealFileSize(info.src)));
+      
+      batch.forEach((info, idx) => {
+        const realSize = sizes[idx];
+        // Fallback to estimate if HEAD request fails
+        const estimatedSize = (info.width || 800) * (info.height || 800) * (info.format === "PNG" ? 4 : 3) * 0.15;
+        
+        allImages.push({
+          imageUrl: info.src,
+          imageName: `${info.productTitle.substring(0, 30)}_${info.imageId}.${info.format.toLowerCase()}`,
+          originalSize: realSize || Math.round(estimatedSize),
+          format: info.format,
+          shopifyAssetId: `gid://shopify/ProductImage/${info.imageId}`,
+          shopifyProductId: `${info.productId}`,
+        });
+      });
     }
     
     console.log(`[Shopify] Found ${allImages.length} images for ${domain}`);
