@@ -650,6 +650,7 @@ export default function Home() {
         open={showUpgradeModal} 
         onClose={() => setShowUpgradeModal(false)}
         onSuccess={() => setIsProUser(true)}
+        shopDomain={scanResult?.shop?.domain || storeUrl}
       />
     </div>
   );

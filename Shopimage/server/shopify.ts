@@ -225,6 +225,180 @@ export async function handleCallback(req: Request, res: Response) {
   }
 }
 
+// Shopify Billing API - Create recurring subscription
+export async function createBillingSubscription(req: Request, res: Response) {
+  try {
+    const { shop } = req.body;
+
+    if (!shop || typeof shop !== "string") {
+      return res.status(400).json({ error: "Missing shop parameter" });
+    }
+
+    if (!validateShopDomain(shop)) {
+      return res.status(400).json({ error: "Invalid shop domain" });
+    }
+
+    const shopData = await storage.getShopByDomain(shop);
+    if (!shopData || !shopData.accessToken) {
+      return res.status(401).json({ error: "Shop not installed" });
+    }
+
+    const baseUrl = getBaseUrl();
+    const returnUrl = `${baseUrl}/api/shopify/billing/callback?shop=${encodeURIComponent(shop)}`;
+
+    // Create recurring application charge using GraphQL API
+    const mutation = `
+      mutation AppSubscriptionCreate($name: String!, $returnUrl: URL!, $lineItems: [AppSubscriptionLineItemInput!]!) {
+        appSubscriptionCreate(
+          name: $name
+          returnUrl: $returnUrl
+          lineItems: $lineItems
+          test: ${process.env.NODE_ENV !== 'production' ? 'true' : 'false'}
+        ) {
+          appSubscription {
+            id
+            status
+          }
+          confirmationUrl
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      name: "Shopimage Pro",
+      returnUrl,
+      lineItems: [
+        {
+          plan: {
+            appRecurringPricingDetails: {
+              price: {
+                amount: 9.99,
+                currencyCode: "USD"
+              },
+              interval: "EVERY_30_DAYS"
+            }
+          }
+        }
+      ]
+    };
+
+    console.log(`[Shopify Billing] Creating subscription for ${shop}...`);
+
+    const response = await fetch(`https://${shop}/admin/api/2024-01/graphql.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopData.accessToken,
+      },
+      body: JSON.stringify({ query: mutation, variables }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Shopify Billing] API error:", errorText);
+      return res.status(500).json({ error: "Failed to create subscription" });
+    }
+
+    const data = await response.json() as any;
+    console.log("[Shopify Billing] Response:", JSON.stringify(data, null, 2));
+
+    if (data.data?.appSubscriptionCreate?.userErrors?.length > 0) {
+      const errors = data.data.appSubscriptionCreate.userErrors;
+      console.error("[Shopify Billing] User errors:", errors);
+      return res.status(400).json({ error: errors[0].message });
+    }
+
+    const confirmationUrl = data.data?.appSubscriptionCreate?.confirmationUrl;
+    if (!confirmationUrl) {
+      return res.status(500).json({ error: "No confirmation URL returned" });
+    }
+
+    console.log(`[Shopify Billing] Confirmation URL: ${confirmationUrl}`);
+    return res.json({ confirmationUrl });
+  } catch (error) {
+    console.error("[Shopify Billing] Error:", error);
+    return res.status(500).json({ error: "Failed to create subscription" });
+  }
+}
+
+// Shopify Billing callback - after user approves/declines
+export async function handleBillingCallback(req: Request, res: Response) {
+  try {
+    const { shop, charge_id } = req.query;
+
+    if (!shop || typeof shop !== "string") {
+      return res.status(400).json({ error: "Missing shop parameter" });
+    }
+
+    const shopData = await storage.getShopByDomain(shop);
+    if (!shopData || !shopData.accessToken) {
+      return res.status(401).json({ error: "Shop not installed" });
+    }
+
+    // Check subscription status using GraphQL
+    const query = `
+      query {
+        currentAppInstallation {
+          activeSubscriptions {
+            id
+            name
+            status
+            currentPeriodEnd
+            lineItems {
+              plan {
+                pricingDetails {
+                  ... on AppRecurringPricing {
+                    price {
+                      amount
+                      currencyCode
+                    }
+                    interval
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(`https://${shop}/admin/api/2024-01/graphql.json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopData.accessToken,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    const data = await response.json() as any;
+    console.log("[Shopify Billing] Subscription status:", JSON.stringify(data, null, 2));
+
+    const activeSubscriptions = data.data?.currentAppInstallation?.activeSubscriptions || [];
+    const hasActiveSubscription = activeSubscriptions.some(
+      (sub: any) => sub.status === "ACTIVE"
+    );
+
+    if (hasActiveSubscription) {
+      // Update shop to Pro status
+      await storage.updateShopProStatus(shopData.id, true);
+      console.log(`[Shopify Billing] Shop ${shop} upgraded to Pro!`);
+    }
+
+    const baseUrl = getBaseUrl();
+    const status = hasActiveSubscription ? "success" : "cancelled";
+    res.redirect(`${baseUrl}/?shop=${encodeURIComponent(shop)}&billing=${status}`);
+  } catch (error) {
+    console.error("[Shopify Billing] Callback error:", error);
+    const baseUrl = getBaseUrl();
+    res.redirect(`${baseUrl}/?billing=error`);
+  }
+}
+
 export async function getShopSession(req: Request, res: Response) {
   try {
     const shop = req.query.shop as string || req.headers["x-shopify-shop-domain"] as string;

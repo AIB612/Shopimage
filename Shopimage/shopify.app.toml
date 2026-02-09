@@ -1,0 +1,24 @@
+# Shopify App Configuration
+# Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Shopimage"
+client_id = "8bb93335f801c72a4202bb83ceb58ff3"
+application_url = "https://shopimage.onrender.com"
+embedded = false
+
+[access_scopes]
+scopes = "read_products,write_products,read_themes,write_themes"
+
+[auth]
+redirect_urls = ["https://shopimage.onrender.com/api/shopify/callback"]
+
+[webhooks]
+api_version = "2024-01"
+
+  [webhooks.privacy_compliance]
+  customer_data_request_url = "https://shopimage.onrender.com/api/webhooks/customers/data_request"
+  customer_deletion_url = "https://shopimage.onrender.com/api/webhooks/customers/redact"
+  shop_deletion_url = "https://shopimage.onrender.com/api/webhooks/shop/redact"
+
+[pos]
+embedded = false
