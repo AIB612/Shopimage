@@ -731,8 +731,8 @@ export async function registerRoutes(
   app.post("/api/webhooks/customers/data_request", async (req, res) => {
     console.log('[Webhook] Received customers/data_request');
     
-    // Verify HMAC (optional in dev, required in production)
-    if (process.env.NODE_ENV === 'production' && !verifyShopifyWebhook(req)) {
+    // Always verify HMAC signature from Shopify
+    if (!verifyShopifyWebhook(req)) {
       return res.status(401).json({ error: 'Invalid HMAC signature' });
     }
     
@@ -751,7 +751,8 @@ export async function registerRoutes(
   app.post("/api/webhooks/customers/redact", async (req, res) => {
     console.log('[Webhook] Received customers/redact');
     
-    if (process.env.NODE_ENV === 'production' && !verifyShopifyWebhook(req)) {
+    // Always verify HMAC signature from Shopify
+    if (!verifyShopifyWebhook(req)) {
       return res.status(401).json({ error: 'Invalid HMAC signature' });
     }
     
@@ -770,7 +771,8 @@ export async function registerRoutes(
   app.post("/api/webhooks/shop/redact", async (req, res) => {
     console.log('[Webhook] Received shop/redact');
     
-    if (process.env.NODE_ENV === 'production' && !verifyShopifyWebhook(req)) {
+    // Always verify HMAC signature from Shopify
+    if (!verifyShopifyWebhook(req)) {
       return res.status(401).json({ error: 'Invalid HMAC signature' });
     }
     
