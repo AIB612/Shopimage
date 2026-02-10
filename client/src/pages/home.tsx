@@ -416,6 +416,23 @@ export default function Home() {
                 <p className="text-xs text-muted-foreground">Optimize your Shopify store images</p>
               </div>
             </div>
+            <Button 
+              onClick={() => {
+                if (storeUrl) {
+                  window.location.href = `/api/auth/shopify?shop=${encodeURIComponent(storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''))}`;
+                } else {
+                  document.getElementById('store-url-input')?.focus();
+                  toast({
+                    title: "Enter your store URL",
+                    description: "Please enter your Shopify store URL first",
+                  });
+                }
+              }}
+              className="gap-2"
+            >
+              <Zap className="w-4 h-4" />
+              Try Free
+            </Button>
           </div>
         </header>
 
@@ -444,6 +461,7 @@ export default function Home() {
               {/* URL Input */}
               <div className="flex gap-3 max-w-md mx-auto">
                 <Input
+                  id="store-url-input"
                   placeholder="your-store.myshopify.com"
                   value={storeUrl}
                   onChange={(e) => setStoreUrl(e.target.value)}
