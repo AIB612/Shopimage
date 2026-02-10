@@ -950,6 +950,28 @@ export default function Home() {
         )}
       </main>
 
+      {/* Footer */}
+      <footer className="border-t bg-card mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-muted-foreground">
+              © 2026 Shopimage. All rights reserved.
+            </p>
+            <div className="flex gap-6">
+              <a href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Pricing
+              </a>
+              <a href="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Privacy Policy
+              </a>
+              <a href="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Terms of Service
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+
       <UpgradeModal 
         open={showUpgradeModal} 
         onClose={() => setShowUpgradeModal(false)}
