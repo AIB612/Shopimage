@@ -301,15 +301,7 @@ export default function Home() {
           {appState === "unauthorized" && (
             <Button 
               onClick={() => {
-                if (storeUrl) {
-                  window.location.href = `/api/auth/shopify?shop=${encodeURIComponent(storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''))}`;
-                } else {
-                  document.getElementById('store-url-input')?.focus();
-                  toast({
-                    title: "Enter your store URL",
-                    description: "Please enter your Shopify store URL first",
-                  });
-                }
+                window.location.href = 'https://admin.shopify.com/oauth/install?client_id=8bb93335f801c72a4202bb83ceb58ff3';
               }}
               className="rounded-xl font-bold gap-2"
             >
