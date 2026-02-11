@@ -7,21 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ImageAnalysis, ScanResult } from "@shared/schema";
-// Shopify icon SVG component
-const ShopifyIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M15.337 3.415c-.022-.165-.165-.247-.275-.258-.11-.011-2.447-.176-2.447-.176s-1.623-1.612-1.8-1.789c-.177-.176-.522-.124-.656-.082-.022 0-.297.088-.77.242-.462-1.327-1.276-2.548-2.711-2.548-.077 0-.165 0-.253.011C6.07-.561 5.608-.22 5.19.22c-1.276 1.392-1.788 3.477-1.975 5.243-.99.308-1.689.528-1.777.55-.55.176-.567.187-.633.704-.055.385-1.491 11.476-1.491 11.476L13.65 20.5l6.35-1.37s-4.641-15.55-4.663-15.715zM11.13 4.656l-1.975.605c0-.484-.066-1.173-.22-1.95.55.11.935.715 1.195 1.345zm-2.447.748l-2.14.66c.209-.814.605-1.623 1.09-2.151.176-.198.429-.418.715-.55.286.572.352 1.381.335 2.041zm-1.623-2.777c.231 0 .44.044.627.132-.275.143-.539.363-.781.627-.638.693-1.129 1.777-1.326 2.822l-1.777.55c.352-1.876 1.722-4.12 3.257-4.131z"/>
-    <path d="M15.062 3.157c-.11-.011-2.447-.176-2.447-.176s-1.623-1.612-1.8-1.789c-.066-.066-.154-.099-.242-.121l-.88 17.929 6.35-1.37s-4.641-15.55-4.663-15.715c-.022-.165-.165-.247-.275-.258l-.043-.5z"/>
-  </svg>
-);
-
-import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon, Sparkles, TrendingUp, Check } from "lucide-react";
+import { Zap, Loader2, RefreshCw, Upload, Gauge, HardDrive, Clock, CheckCircle2, Store, Activity, Lock, Crown, ExternalLink, ArrowRight, ImageIcon } from "lucide-react";
+import logoImage from "@assets/水母_1769859103227.png";
 import { Input } from "@/components/ui/input";
 import { ImageResultCard } from "@/components/image-result-card";
 import { UpgradeModal } from "@/components/upgrade-modal";
-
-// Logo URL fallback (using a placeholder or direct public path if possible)
-const LOGO_URL = "/logo.svg";
 
 interface ShopInfo {
   name: string;
@@ -34,6 +24,21 @@ interface ShopInfo {
   spaceSaved: number;
 }
 
+interface BillingStatus {
+  plan: string;
+  planName: string;
+  imagesPerMonth: number;
+  usage: {
+    imagesOptimized: number;
+    limit: number;
+    remaining: number;
+  };
+  subscription: {
+    active: boolean;
+    id: string | null;
+  };
+}
+
 type AppState = "unauthorized" | "loading" | "ready" | "scanning" | "complete";
 
 interface ScanStatus {
@@ -41,348 +46,545 @@ interface ScanStatus {
   message: string;
 }
 
+// Demo case study data
 const DEMO_IMAGES = [
-  { id: "demo-1", imageName: "hero-slider-autumn.jpg", originalSize: 3200000, optimizedSize: 640000, status: "optimized" as const, imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&h=100&fit=crop" },
-  { id: "demo-2", imageName: "product-gallery-01.png", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const, imageUrl: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=100&h=100&fit=crop" },
-  { id: "demo-3", imageName: "collection-grid-bg.webp", originalSize: 2100000, optimizedSize: 420000, status: "pending" as const, imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100&h=100&fit=crop" },
+  { id: "demo-1", imageName: "product-hero.jpg", originalSize: 2100000, optimizedSize: 420000, status: "optimized" as const },
+  { id: "demo-2", imageName: "banner-main.png", originalSize: 1800000, optimizedSize: 360000, status: "optimized" as const },
+  { id: "demo-3", imageName: "collection-bg.jpg", originalSize: 1500000, optimizedSize: 300000, status: "optimized" as const },
+  { id: "demo-4", imageName: "product-detail.jpg", originalSize: 1200000, optimizedSize: 240000, status: "pending" as const },
+  { id: "demo-5", imageName: "lifestyle-shot.jpg", originalSize: 980000, optimizedSize: 196000, status: "pending" as const },
 ];
 
 export default function Home() {
-  // Start directly with "unauthorized" to show input form immediately
-  const [appState, setAppState] = useState<AppState>("unauthorized");
+  const [appState, setAppState] = useState<AppState>("loading");
   const [scanStatus, setScanStatus] = useState<ScanStatus>({ progress: 0, message: "" });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [images, setImages] = useState<ImageAnalysis[]>([]);
-  const [totalImageCount, setTotalImageCount] = useState(0);
   const [fixCount, setFixCount] = useState(0);
-  const [syncCount, setSyncCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isProUser, setIsProUser] = useState(false);
-  const [hasUsedFreeOptimize, setHasUsedFreeOptimize] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isSynced, setIsSynced] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [autoScanTriggered, setAutoScanTriggered] = useState(false);
-  const FREE_IMAGE_LIMIT = 5;
   const { toast } = useToast();
-  
-  // Count optimized but not synced images
-  const optimizedNotSynced = images.filter(img => img.status === 'optimized' && (img as any).syncStatus !== 'synced').length;
 
-  // Shop info query - not blocking page load anymore
-  const shopInfoQuery = useQuery<ShopInfo>({
-    queryKey: ["/api/shop/info"],
+  // Get shop from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const shopFromUrl = urlParams.get("shop");
+
+  // Fetch billing status
+  const billingQuery = useQuery<BillingStatus>({
+    queryKey: ["/api/billing/status", shopFromUrl],
+    queryFn: async () => {
+      const response = await fetch(`/api/billing/status?shop=${encodeURIComponent(shopFromUrl || "")}`);
+      if (!response.ok) throw new Error("Failed to fetch billing status");
+      return response.json();
+    },
+    enabled: !!shopFromUrl,
     refetchOnWindowFocus: false,
-    retry: 1,
   });
 
-  // Auto-scan when shop parameter is present (from OAuth or Shopify App)
+  const isProUser = billingQuery.data?.plan === "pro";
+  const isBasicUser = billingQuery.data?.plan === "basic";
+  const isPaidUser = isProUser || isBasicUser;
+  const usageLimit = billingQuery.data?.usage.limit || 5;
+  const usageRemaining = billingQuery.data?.usage.remaining ?? usageLimit;
+
+  // Fetch shop info automatically
+  const shopInfoQuery = useQuery<ShopInfo>({
+    queryKey: ["/api/shop/info", shopFromUrl],
+    queryFn: async () => {
+      if (!shopFromUrl) {
+        throw new Error("No shop parameter");
+      }
+      const response = await fetch(`/api/shop/info?shop=${encodeURIComponent(shopFromUrl)}`);
+      if (!response.ok) {
+        const data = await response.json();
+        if (data.installUrl) {
+          window.location.href = data.installUrl;
+        }
+        throw new Error(data.error || "Failed to fetch shop info");
+      }
+      return response.json();
+    },
+    enabled: !!shopFromUrl,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
-    if (autoScanTriggered) return;
-    
-    const params = new URLSearchParams(window.location.search);
-    const shop = params.get("shop");
-    
-    // If shop parameter exists, auto-scan (works for both OAuth callback and Shopify embedded app)
-    if (shop) {
-      setAutoScanTriggered(true);
-      setStoreUrl(shop);
-      // Clean up URL
-      window.history.replaceState({}, "", "/");
-      // Trigger scan after a short delay
-      setTimeout(() => {
-        scanMutation.mutate(shop);
-      }, 100);
+    if (!shopFromUrl) {
+      setAppState("unauthorized");
+      return;
     }
-  }, [autoScanTriggered]);
+    if (appState === "loading") {
+      if (shopInfoQuery.data) {
+        setAppState("ready");
+      } else if (shopInfoQuery.isError || (!shopInfoQuery.isLoading && !shopInfoQuery.data)) {
+        setAppState("unauthorized");
+      }
+    }
+  }, [shopInfoQuery.data, shopInfoQuery.isError, shopInfoQuery.isLoading, appState, shopFromUrl]);
+
+  // Calculate stats
+  const optimizedCount = images.filter(img => img.status === "optimized").length;
+  const pendingCount = images.filter(img => img.status === "pending").length;
+  const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
+  const totalOptimizedSize = images.reduce((sum, img) => 
+    img.status === "optimized" ? sum + img.estimatedOptimizedSize : sum + img.originalSize, 0);
+  const spaceSaved = totalOriginalSize - totalOptimizedSize;
 
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
-      const response = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: domain }),
-        credentials: "include",
-      });
-      
+      const response = await apiRequest("POST", "/api/scan", { url: domain });
       const data = await response.json();
-      
-      // Check if needs install
-      if (!response.ok) {
-        if (data.needsInstall && data.installUrl) {
-          // Redirect to Shopify install
-          window.location.href = data.installUrl;
-          throw new Error("Redirecting to install...");
-        }
-        throw new Error(data.message || "Failed to scan store");
-      }
-      
       return data as ScanResult;
     },
     onMutate: () => {
       setAppState("scanning");
-      setScanStatus({ progress: 0, message: "Connecting to Shopify..." });
-      let p = 0;
-      const interval = setInterval(() => {
-        p += 5;
-        if (p >= 95) clearInterval(interval);
-        setScanStatus(s => ({ ...s, progress: Math.min(p, 95) }));
-      }, 200);
-      return { interval };
+      setScanStatus({ progress: 0, message: "Connecting to store..." });
+      
+      const progressSteps = [
+        { progress: 15, message: "Fetching product images...", delay: 800 },
+        { progress: 35, message: "Analyzing theme assets...", delay: 1200 },
+        { progress: 55, message: "Measuring file sizes...", delay: 1000 },
+        { progress: 75, message: "Calculating optimizations...", delay: 900 },
+        { progress: 90, message: "Generating report...", delay: 700 },
+      ];
+
+      let currentStep = 0;
+      const runStep = () => {
+        if (currentStep < progressSteps.length) {
+          const step = progressSteps[currentStep];
+          setScanStatus({ progress: step.progress, message: step.message });
+          currentStep++;
+          setTimeout(runStep, step.delay);
+        }
+      };
+      setTimeout(runStep, 500);
     },
-    onSuccess: (data, variables, context) => {
-      if (context?.interval) clearInterval(context.interval);
-      setScanStatus({ progress: 100, message: "Analysis successful!" });
-      
-      console.log("=== SCAN SUCCESS ===");
-      console.log("Raw data:", data);
-      console.log("Images count:", data?.images?.length);
-      
+    onSuccess: (data) => {
+      setScanStatus({ progress: 100, message: "Complete!" });
       setTimeout(() => {
         setAppState("complete");
         setScanResult(data);
-        // Save total count for display
-        const totalCount = data?.images?.length || 0;
-        console.log("Setting totalImageCount:", totalCount);
-        setTotalImageCount(totalCount);
-        // Only load first 20 images for performance
-        const limitedImages = (data?.images || []).slice(0, 20);
-        console.log("Limited images:", limitedImages.length);
-        const analysisImages: ImageAnalysis[] = limitedImages.map((img) => ({
+        
+        const imageList = data?.images || [];
+        const analysisImages: ImageAnalysis[] = imageList.map((img) => ({
           id: img.id,
           imageUrl: img.imageUrl,
           imageName: img.imageName,
           originalSize: img.originalSize,
-          estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.25),
+          estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.2),
           format: img.format,
-          timeSaved: (img.originalSize * 0.8 / 1024 / 1024) / 1.5,
-          status: (img.status || "pending") as any,
+          timeSaved: ((img.originalSize - (img.optimizedSize || img.originalSize * 0.2)) / 1024 / 1024) / 1.5,
+          status: img.status,
         }));
-        console.log("Setting images:", analysisImages.length);
         setImages(analysisImages);
-        toast({ title: "Scan Complete", description: `Found ${totalCount} images to optimize.` });
-      }, 500);
+        queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
+      }, 600);
     },
-    onError: (error: Error, variables, context) => {
-      if (context?.interval) clearInterval(context.interval);
-      // Don't show error if redirecting to install
-      if (error.message === "Redirecting to install...") {
-        setScanStatus({ progress: 50, message: "Redirecting to Shopify..." });
-        return;
-      }
-      setAppState("unauthorized");
-      toast({ title: "Scan Failed", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      setAppState("ready");
+      toast({
+        title: "Scan Failed",
+        description: error.message || "Failed to analyze the store.",
+        variant: "destructive",
+      });
     },
   });
 
+  const fixMutation = useMutation({
+    mutationFn: async (imageId: string) => {
+      const response = await apiRequest("POST", `/api/images/${imageId}/fix`);
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || "Failed to optimize") as Error & { code?: string };
+        (error as any).code = data.code;
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: (data, imageId) => {
+      setImages(prev => prev.map(img => 
+        img.id === imageId 
+          ? { ...img, status: "optimized" as const, estimatedOptimizedSize: data.optimizedSize }
+          : img
+      ));
+      setFixCount(prev => prev + 1);
+      queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
+      toast({
+        title: "Image Optimized!",
+        description: `Saved ${formatBytes(data.originalSize - data.optimizedSize)}`,
+      });
+    },
+    onError: (error: Error & { code?: string }) => {
+      if (error.code === "USAGE_LIMIT_EXCEEDED") {
+        setShowUpgradeModal(true);
+        toast({
+          title: "Usage Limit Reached",
+          description: "Upgrade your plan to optimize more images.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Optimization Failed",
+          description: error.message || "Failed to optimize the image.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const optimizeAllMutation = useMutation({
+    mutationFn: async (shopId: string) => {
+      const response = await apiRequest("POST", `/api/shops/${shopId}/optimize-all`);
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || "Failed to optimize") as Error & { code?: string };
+        (error as any).code = data.code;
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: (data) => {
+      // Only update images that were actually optimized
+      if (data.optimizedCount > 0) {
+        setImages(prev => {
+          const optimizedIds = new Set(data.images?.map((img: any) => img.id) || []);
+          return prev.map(img => 
+            optimizedIds.has(img.id) 
+              ? { ...img, status: "optimized" as const, estimatedOptimizedSize: Math.round(img.originalSize * 0.2) }
+              : img
+          );
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/shop/info"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
+      
+      if (data.skippedCount > 0) {
+        toast({
+          title: "Optimization Complete",
+          description: data.message || `Optimized ${data.optimizedCount} images. ${data.skippedCount} skipped due to plan limit.`,
+        });
+        setShowUpgradeModal(true);
+      } else {
+        toast({
+          title: "All Images Optimized!",
+          description: `Successfully optimized ${data.optimizedCount} images`,
+        });
+      }
+    },
+    onError: (error: Error & { code?: string }) => {
+      if (error.code === "USAGE_LIMIT_EXCEEDED") {
+        setShowUpgradeModal(true);
+        toast({
+          title: "Usage Limit Reached",
+          description: "Upgrade your plan to optimize more images.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Optimization Failed",
+          description: error.message || "Failed to optimize images.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (shopId: string) => {
+      const response = await apiRequest("POST", `/api/shops/${shopId}/sync`);
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsSynced(true);
+      toast({
+        title: "Synced to Shopify!",
+        description: "All optimized images have been uploaded to your store.",
+      });
+    },
+  });
+
+  const handleFix = (imageId: string) => {
+    // Check usage limit (Pro users have unlimited = -1)
+    if (!isProUser && usageRemaining <= 0) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    fixMutation.mutate(imageId);
+  };
+
+  const handleOptimizeAll = () => {
+    if (!scanResult?.shop?.id) return;
+    optimizeAllMutation.mutate(scanResult.shop.id);
+  };
+
+  const handleSync = () => {
+    if (!scanResult?.shop?.id) return;
+    syncMutation.mutate(scanResult.shop.id);
+  };
+
+  const handleScan = () => {
+    if (shopInfoQuery.data?.domain) {
+      scanMutation.mutate(shopInfoQuery.data.domain);
+    }
+  };
+
+  const handleRescan = () => {
+    setAppState("ready");
+    setScanResult(null);
+    setImages([]);
+    setIsSynced(false);
+  };
+
   const formatBytes = (bytes: number): string => {
-    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    }
     return `${(bytes / 1024).toFixed(0)}KB`;
   };
 
-  const handleConnectStore = () => {
-    if (!storeUrl.trim()) {
-      toast({ title: "Enter URL", description: "Please enter your .myshopify.com store link.", variant: "destructive" });
-      return;
-    }
-    const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
-    
-    // Validate it's a real Shopify domain
-    if (!cleanDomain.includes(".myshopify.com")) {
-      toast({ title: "Invalid Store URL", description: "Please enter a valid Shopify store URL (e.g., your-store.myshopify.com)", variant: "destructive" });
-      return;
-    }
-    
-    // Check domain format
-    const shopName = cleanDomain.replace(".myshopify.com", "");
-    if (!shopName || shopName.length < 2 || !/^[a-zA-Z0-9-]+$/.test(shopName)) {
-      toast({ title: "Invalid Store Name", description: "Store name must be at least 2 characters and contain only letters, numbers, or hyphens.", variant: "destructive" });
-      return;
-    }
-    
-    // Run scan with validated domain
-    scanMutation.mutate(cleanDomain);
-  };
-  
-  // Function to start OAuth install flow
-  const handleInstallApp = () => {
-    const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
-    if (cleanDomain.endsWith(".myshopify.com")) {
-      window.location.href = `/api/shopify/install?shop=${cleanDomain}`;
-    } else {
-      toast({ title: "Invalid Domain", description: "Please enter a valid .myshopify.com store URL.", variant: "destructive" });
-    }
+  const getLatencyStatus = (latency: number) => {
+    if (latency < 100) return { label: "Good", color: "bg-green-500", textColor: "text-green-600" };
+    if (latency <= 300) return { label: "Needs Improvement", color: "bg-yellow-500", textColor: "text-yellow-600" };
+    return { label: "Poor", color: "bg-red-500", textColor: "text-red-600" };
   };
 
-  // Handle free optimization (first 5 images)
-  const handleFreeOptimize = async () => {
-    setIsOptimizing(true);
-    const imagesToOptimize = images.slice(0, FREE_IMAGE_LIMIT).filter(img => img.status !== 'optimized');
-    
-    for (let i = 0; i < imagesToOptimize.length; i++) {
-      const image = imagesToOptimize[i];
-      try {
-        // Call real API to optimize
-        const res = await fetch(`/api/images/${image.id}/fix`, { method: 'POST' });
-        if (res.ok) {
-          const optimized = await res.json();
-          setImages(prev => prev.map(img => 
-            img.id === image.id 
-              ? { ...img, status: 'optimized' as const, estimatedOptimizedSize: optimized.optimizedSize || img.estimatedOptimizedSize }
-              : img
-          ));
-          setFixCount(f => f + 1);
-        }
-      } catch (error) {
-        console.error('Failed to optimize image:', error);
-      }
-    }
-    
-    setIsOptimizing(false);
-    setHasUsedFreeOptimize(true);
-    toast({ 
-      title: "Optimization Complete!", 
-      description: `Successfully optimized ${imagesToOptimize.length} images for free.` 
-    });
+  const getPerformanceScore = (): number => {
+    if (images.length === 0) return shopInfoQuery.data?.totalImages ? 0 : 100;
+    const optimizedRatio = optimizedCount / images.length;
+    return Math.round(40 + optimizedRatio * 60);
   };
 
-  // Handle sync all optimized images to Shopify
-  const handleSyncAll = async () => {
-    const imagesToSync = images.filter(img => img.status === 'optimized' && (img as any).syncStatus !== 'synced');
-    if (imagesToSync.length === 0) {
-      toast({ title: "Nothing to Sync", description: "No optimized images to sync.", variant: "destructive" });
-      return;
-    }
-    
-    setIsSyncing(true);
-    let syncedCount = 0;
-    
-    for (const image of imagesToSync) {
-      try {
-        const res = await fetch(`/api/images/${image.id}/sync`, { method: 'POST' });
-        if (res.ok) {
-          setImages(prev => prev.map(img => 
-            img.id === image.id 
-              ? { ...img, syncStatus: 'synced' } as any
-              : img
-          ));
-          syncedCount++;
-          setSyncCount(c => c + 1);
-        }
-      } catch (error) {
-        console.error('Failed to sync image:', error);
-      }
-    }
-    
-    setIsSyncing(false);
-    toast({ 
-      title: "Sync Complete!", 
-      description: `Successfully synced ${syncedCount} images to your Shopify store.` 
-    });
-  };
-
-  // UI Components
-  const Header = () => (
-    <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
-          <div className="w-12 h-12 flex items-center justify-center p-1">
-            <img src={LOGO_URL} alt="Shopimage" className="w-full h-full object-contain" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tighter text-black uppercase">Shopimage</h1>
-            <Badge variant="secondary" className="text-[10px] h-4 font-bold bg-primary/10 text-primary border-none">BETA v2.0</Badge>
-          </div>
-        </a>
-        {appState === "complete" && (
-          <Button variant="outline" size="sm" onClick={() => setAppState("ready")} className="rounded-xl font-bold">New Scan</Button>
-        )}
-      </div>
-    </header>
-  );
-
-  if (appState === "loading") {
+  // Loading state
+  if (shopInfoQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center animate-in zoom-in-95 duration-500">
-          <div className="w-16 h-16 bg-black rounded-3xl mb-4 mx-auto flex items-center justify-center animate-pulse">
-             <Sparkles className="text-white w-8 h-8" />
-          </div>
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Waking up...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Loading store information...</p>
         </div>
       </div>
     );
   }
 
-  if (appState === "unauthorized" || appState === "ready") {
+  // Unauthorized / Landing Page
+  if (appState === "unauthorized" || shopInfoQuery.error) {
+    const demoTotalOriginal = DEMO_IMAGES.reduce((sum, img) => sum + img.originalSize, 0);
+    const demoTotalOptimized = DEMO_IMAGES.reduce((sum, img) => sum + img.optimizedSize, 0);
+    const demoSpaceSaved = demoTotalOriginal - demoTotalOptimized;
+    const demoOptimizedCount = DEMO_IMAGES.filter(img => img.status === "optimized").length;
+    
+    const handleConnectStore = () => {
+      if (!storeUrl.trim()) {
+        toast({
+          title: "Please enter store URL",
+          description: "Enter your Shopify store URL to connect",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Normalize the store URL to get the myshopify.com domain
+      let shop = storeUrl.trim().toLowerCase();
+      // Remove protocol if present
+      shop = shop.replace(/^https?:\/\//, "");
+      // Remove trailing slash
+      shop = shop.replace(/\/$/, "");
+      // If it doesn't end with .myshopify.com, append it
+      if (!shop.endsWith(".myshopify.com")) {
+        // Remove any existing domain suffix
+        shop = shop.split(".")[0];
+        shop = `${shop}.myshopify.com`;
+      }
+      
+      // Redirect to install endpoint
+      window.location.href = `/api/shopify/install?shop=${encodeURIComponent(shop)}`;
+    };
+
     return (
-      <div className="min-h-screen bg-slate-50">
-        <Header />
-        <main className="max-w-7xl mx-auto px-6 py-16">
-          <div className="grid lg:grid-cols-2 gap-16 items-center text-left">
-            <div className="space-y-8">
-              <Badge className="bg-primary text-white font-black px-4 py-1.5 rounded-full shadow-lg shadow-primary/20">NEW: AI ENGINE ACTIVATED</Badge>
-              <h2 className="text-6xl md:text-7xl font-black text-slate-900 leading-[0.9] tracking-tighter">
-                Stop Losing <span className="text-primary italic">Sales</span> to Slow Loading.
-              </h2>
-              <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-xl">
-                One-click image weight reduction for Shopify. Higher conversion, better SEO, zero effort.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-3 bg-white p-2 rounded-[2.5rem] shadow-2xl shadow-black/5 border border-slate-200 ring-4 ring-white/50 focus-within:ring-primary/10 transition-all">
-                <Input 
-                  placeholder="your-store.myshopify.com" 
-                  value={storeUrl}
-                  onChange={(e) => setStoreUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleConnectStore()}
-                  className="h-14 border-none bg-transparent text-lg font-bold px-8 focus-visible:ring-0 placeholder:text-slate-300"
-                />
-                <Button 
-                  onClick={handleConnectStore}
-                  className="h-14 px-10 rounded-[2rem] font-black text-lg bg-black hover:bg-primary transition-all active:scale-95 shadow-xl shadow-black/20"
-                >
-                  Analyze Now <ArrowRight className="ml-2 w-6 h-6" />
-                </Button>
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="border-b bg-card">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-foreground">Image Weight Checker</h1>
+                <p className="text-xs text-muted-foreground">Optimize your Shopify store images</p>
               </div>
             </div>
+            <Button 
+              onClick={() => {
+                if (storeUrl) {
+                  window.location.href = `/api/auth/shopify?shop=${encodeURIComponent(storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''))}`;
+                } else {
+                  document.getElementById('store-url-input')?.focus();
+                  toast({
+                    title: "Enter your store URL",
+                    description: "Please enter your Shopify store URL first",
+                  });
+                }
+              }}
+              className="gap-2"
+            >
+              <Zap className="w-4 h-4" />
+              Try Free
+            </Button>
+          </div>
+        </header>
 
-            <div className="relative">
-               <Card className="p-8 border-none shadow-2xl bg-white/40 backdrop-blur-xl relative z-10 rounded-[2rem] overflow-hidden border border-white">
-                  <div className="flex items-center justify-between mb-8">
-                    <h4 className="font-black text-xl tracking-tight uppercase">Live Case Study</h4>
-                    <TrendingUp className="text-green-500 w-6 h-6" />
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          {/* Hero Section */}
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-foreground mb-4">
+              Speed Up Your Shopify Store
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Optimize your product images to improve page load times and boost your store's performance score.
+            </p>
+          </div>
+
+          {/* Connect Store Section */}
+          <Card className="p-8 mb-8 max-w-2xl mx-auto">
+            <div className="text-center space-y-6">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <Store className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Connect Your Store</h3>
+                <p className="text-muted-foreground">Enter your Shopify store URL or install the app to get started</p>
+              </div>
+              
+              {/* URL Input */}
+              <div className="flex gap-3 max-w-md mx-auto">
+                <Input
+                  id="store-url-input"
+                  placeholder="your-store.myshopify.com"
+                  value={storeUrl}
+                  onChange={(e) => setStoreUrl(e.target.value)}
+                  className="flex-1"
+                  data-testid="input-store-url"
+                />
+                <Button onClick={handleConnectStore} className="gap-2" data-testid="button-connect">
+                  <ArrowRight className="w-4 h-4" />
+                  Connect
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-4 justify-center">
+                <div className="h-px bg-border flex-1 max-w-20" />
+                <span className="text-sm text-muted-foreground">or</span>
+                <div className="h-px bg-border flex-1 max-w-20" />
+              </div>
+
+              {/* Install App Button */}
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => {
+                  toast({
+                    title: "App Installation",
+                    description: "Shopify App Store link coming soon!",
+                  });
+                }}
+                data-testid="button-install-app"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Install from Shopify App Store
+              </Button>
+            </div>
+          </Card>
+
+          {/* Case Study Section */}
+          <div className="mt-12">
+            <div className="text-center mb-8">
+              <Badge variant="secondary" className="mb-4">Case Study</Badge>
+              <h3 className="text-2xl font-bold text-foreground mb-2">See the Results</h3>
+              <p className="text-muted-foreground">Example optimization from a real Shopify store</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Demo Stats */}
+              <div className="lg:col-span-1 space-y-4">
+                <Card className="p-6">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-4">Before & After</h4>
+                  
+                  {/* Before */}
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-red-600 dark:text-red-400">Before</span>
+                      <Badge variant="outline" className="text-red-600 border-red-300">Score: 35</Badge>
+                    </div>
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                      {formatBytes(demoTotalOriginal)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Total image size</p>
                   </div>
-                  <div className="space-y-6">
-                    {DEMO_IMAGES.map(img => (
-                      <div key={img.id} className="flex items-center gap-4 bg-white/60 p-4 rounded-2xl shadow-sm border border-white/50">
-                        <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center overflow-hidden">
-                          <img src={img.imageUrl} alt={img.imageName} className="w-full h-full object-cover" />
+
+                  {/* After */}
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-green-600 dark:text-green-400">After</span>
+                      <Badge variant="outline" className="text-green-600 border-green-300">Score: 92</Badge>
+                    </div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {formatBytes(demoTotalOptimized)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Total image size</p>
+                  </div>
+
+                  {/* Savings */}
+                  <div className="mt-4 p-4 bg-primary/10 rounded-lg text-center">
+                    <div className="text-3xl font-bold text-primary">
+                      {formatBytes(demoSpaceSaved)}
+                    </div>
+                    <p className="text-sm text-muted-foreground">Space Saved (80% reduction)</p>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Demo Image List */}
+              <div className="lg:col-span-2">
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-foreground">Optimized Images</h4>
+                    <Badge variant="secondary">{demoOptimizedCount}/{DEMO_IMAGES.length} optimized</Badge>
+                  </div>
+                  <div className="space-y-3">
+                    {DEMO_IMAGES.map((image) => (
+                      <div 
+                        key={image.id}
+                        className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg"
+                      >
+                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
                         </div>
-                        <div className="flex-1">
-                          <div className="h-2 w-24 bg-slate-200 rounded-full mb-2" />
-                          <div className="flex items-center gap-2">
-                             <span className="text-xs font-bold text-slate-400 line-through">{formatBytes(img.originalSize)}</span>
-                             <ArrowRight className="w-3 h-3 text-slate-300" />
-                             <span className="text-xs font-black text-green-600 bg-green-500/10 px-2 py-0.5 rounded">{formatBytes(img.optimizedSize)}</span>
-                          </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{image.imageName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatBytes(image.originalSize)} → {formatBytes(image.optimizedSize)}
+                          </p>
                         </div>
-                        <Badge className="bg-green-500 text-white font-black rounded-lg border-none">FIXED</Badge>
+                        <div className="text-right">
+                          {image.status === "optimized" ? (
+                            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Optimized
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-8 pt-8 border-t border-slate-200/50 flex items-center justify-between">
-                     <div>
-                       <p className="text-xs font-black text-slate-400 uppercase mb-1">Performance Gain</p>
-                       <p className="text-3xl font-black text-green-500">+88% Score</p>
-                     </div>
-                     <div className="text-right">
-                       <p className="text-xs font-black text-slate-400 uppercase mb-1">Time Saved</p>
-                       <p className="text-3xl font-black text-black">2.4s</p>
-                     </div>
-                  </div>
-               </Card>
-               <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 blur-[100px] -z-10" />
-               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/20 blur-[100px] -z-10" />
+                </Card>
+              </div>
             </div>
           </div>
         </main>
@@ -390,267 +592,394 @@ export default function Home() {
     );
   }
 
-  if (appState === "scanning") {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <Card className="max-w-md w-full p-12 text-center rounded-[3rem] border-none shadow-2xl bg-white animate-in slide-in-from-bottom-10 duration-700">
-           <div className="relative w-32 h-32 mx-auto mb-8">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={377} strokeDashoffset={377 - (377 * scanStatus.progress) / 100} className="text-primary transition-all duration-300 stroke-round" />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center font-black text-3xl">{scanStatus.progress}%</div>
-           </div>
-           <h3 className="text-2xl font-black mb-2 uppercase tracking-tighter">{scanStatus.message}</h3>
-           <p className="text-slate-400 font-medium">Brewing your performance report...</p>
-        </Card>
-      </div>
-    );
-  }
+  const shopInfo = shopInfoQuery.data;
+  const latencyStatus = getLatencyStatus(shopInfo?.speedMetrics.latency || 0);
 
-  // Calculate performance score based on real Web Vitals from API
-  // LCP: <2.5s Good, 2.5-4s Needs Improvement, >4s Poor
-  // INP: <200ms Good, 200-500ms Needs Improvement, >500ms Poor  
-  // CLS: <0.1 Good, 0.1-0.25 Needs Improvement, >0.25 Poor
-  const getPerformanceData = () => {
-    // Use real Web Vitals from API if available
-    if (scanResult?.webVitals) {
-      const { performanceScore, status } = scanResult.webVitals;
-      return { 
-        score: performanceScore || 0, 
-        status: status || 'poor' as const 
-      };
+  // Format usage display
+  const getUsageDisplay = () => {
+    if (!billingQuery.data) return "Loading...";
+    const { plan, usage } = billingQuery.data;
+    if (plan === "pro") {
+      return `${usage.imagesOptimized} optimized (unlimited)`;
     }
-    
-    // Fallback to estimation if no Web Vitals data
-    if (!totalImageCount) return { score: 0, status: 'poor' as const };
-    
-    const heavyImages = scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 1024*1024).length;
-    const heavyRatio = heavyImages / Math.max(totalImageCount, 1);
-    
-    // Estimate score based on heavy images ratio
-    const score = Math.max(0, Math.round(100 - (heavyRatio * 80)));
-    
-    let status: 'good' | 'needs-improvement' | 'poor';
-    if (score >= 80) status = 'good';
-    else if (score >= 50) status = 'needs-improvement';
-    else status = 'poor';
-    
-    return { score, status };
+    return `${usage.imagesOptimized}/${usage.limit} images`;
   };
-  
-  const { score: performanceScore, status: performanceStatus } = getPerformanceData();
-  
-  // Get status color and label
-  const getStatusDisplay = () => {
-    switch (performanceStatus) {
-      case 'good':
-        return { color: 'bg-green-500', textColor: 'text-green-500', label: '🟢 Good', desc: 'Excellent' };
-      case 'needs-improvement':
-        return { color: 'bg-yellow-500', textColor: 'text-yellow-500', label: '🟡 Needs Improvement', desc: 'Fair' };
-      case 'poor':
-        return { color: 'bg-red-500', textColor: 'text-red-500', label: '🔴 Poor', desc: 'Bad' };
+
+  const getPlanBadge = () => {
+    if (!billingQuery.data) return null;
+    const { plan, planName } = billingQuery.data;
+    if (plan === "pro") {
+      return <Badge className="bg-primary text-primary-foreground text-xs gap-1"><Crown className="w-3 h-3" />{planName}</Badge>;
     }
-  };
-  
-  const statusDisplay = getStatusDisplay();
-  
-  // Calculate potential savings in MB
-  const calculatePotentialSavings = () => {
-    const totalOriginal = images.reduce((sum, img) => sum + img.originalSize, 0);
-    const totalOptimized = images.reduce((sum, img) => sum + img.estimatedOptimizedSize, 0);
-    return ((totalOriginal - totalOptimized) / (1024 * 1024)).toFixed(1);
+    if (plan === "basic") {
+      return <Badge className="bg-blue-500 text-white text-xs">{planName}</Badge>;
+    }
+    return <Badge variant="secondary" className="text-xs">{planName}</Badge>;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Header />
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
-            <Card className="p-8 rounded-[2rem] border-none shadow-xl bg-white relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-10"><Store className="w-12 h-12 text-slate-400" /></div>
-               <div className="mb-6">
-                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Store</p>
-                 <h2 className="text-2xl font-black tracking-tighter truncate text-slate-800">{scanResult?.shop?.domain || "Your Store"}</h2>
-               </div>
-               
-               {/* Performance Score */}
-               <div className="mb-6">
-                 <div className="flex items-center justify-between mb-2">
-                   <span className="text-xs font-bold text-slate-400 uppercase">Performance Score</span>
-                   <span className={`text-sm font-black ${statusDisplay.textColor}`}>{statusDisplay.label}</span>
-                 </div>
-                 <div className="flex items-center gap-3 mb-2">
-                   <span className="text-4xl font-black text-slate-800">{performanceScore}</span>
-                   <span className="text-lg font-bold text-slate-400">/100</span>
-                 </div>
-                 <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                   <div 
-                     className={`h-full rounded-full transition-all duration-500 ${statusDisplay.color}`}
-                     style={{ width: `${performanceScore}%` }}
-                   />
-                 </div>
-                 <p className="text-xs text-slate-500 mt-2">{statusDisplay.desc}</p>
-               </div>
-               
-               {/* Stats */}
-               <div className="grid grid-cols-3 gap-4 mb-6 text-center">
-                 <div>
-                   <p className="text-2xl font-black text-slate-800">{totalImageCount}</p>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase">Total Images</p>
-                 </div>
-                 <div>
-                   <p className="text-2xl font-black text-slate-800">{fixCount}</p>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase">Optimized</p>
-                 </div>
-                 <div>
-                   <p className="text-2xl font-black text-slate-800">{calculatePotentialSavings()}MB</p>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase">Potential Savings</p>
-                 </div>
-               </div>
-               
-               <Button 
-                 className="w-full h-14 rounded-2xl bg-primary text-white font-black text-lg hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                 onClick={hasUsedFreeOptimize ? () => setShowUpgradeModal(true) : handleFreeOptimize}
-                 disabled={isOptimizing}
-               >
-                 {isOptimizing ? (
-                   <>
-                     <Loader2 className="mr-2 w-5 h-5 animate-spin" /> Optimizing...
-                   </>
-                 ) : hasUsedFreeOptimize ? (
-                   <>
-                     Optimize All ({totalImageCount}) <Zap className="ml-2 w-5 h-5 fill-current" />
-                   </>
-                 ) : (
-                   <>
-                     Optimize Now ({FREE_IMAGE_LIMIT}) <Zap className="ml-2 w-5 h-5 fill-current" />
-                   </>
-                 )}
-               </Button>
-               
-               {/* Sync All Button - shows when there are optimized images */}
-               {fixCount > 0 && (
-                 <Button 
-                   variant="outline"
-                   className="w-full h-12 rounded-2xl border-primary/30 text-primary font-bold hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed mt-3"
-                   onClick={handleSyncAll}
-                   disabled={isSyncing || optimizedNotSynced === 0}
-                 >
-                   {isSyncing ? (
-                     <>
-                       <Loader2 className="mr-2 w-4 h-4 animate-spin" /> Syncing...
-                     </>
-                   ) : optimizedNotSynced > 0 ? (
-                     <>
-                       <ShopifyIcon className="mr-2 w-4 h-4" /> Sync All to Store ({optimizedNotSynced})
-                     </>
-                   ) : (
-                     <>
-                       <Check className="mr-2 w-4 h-4" /> All Synced ({syncCount})
-                     </>
-                   )}
-                 </Button>
-               )}
-            </Card>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
+              <img src={logoImage} alt="Shopimage Logo" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-foreground">Shopimage</h1>
+              <p className="text-xs text-muted-foreground">Optimize your store images</p>
+            </div>
           </div>
-
-          <div className="lg:col-span-2 space-y-8">
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: "Total Images", val: totalImageCount, icon: ImageIcon, color: "text-blue-500" },
-                  { label: "Needs Optimization", val: scanResult?.totalHeavyImages || images.filter(i => i.originalSize > 500*1024).length, icon: Gauge, color: "text-red-500" },
-                  { label: "Potential Savings", val: `${calculatePotentialSavings()}MB`, icon: HardDrive, color: "text-green-500" },
-                  { label: "Est. Speed Boost", val: scanResult?.potentialTimeSaved ? `${scanResult.potentialTimeSaved.toFixed(1)}s` : "2.5s", icon: Clock, color: "text-purple-500" },
-                ].map((stat, i) => (
-                  <Card key={i} className="p-5 rounded-3xl border-none shadow-md bg-white text-center group hover:shadow-xl transition-all">
-                    <stat.icon className={`mx-auto mb-3 w-6 h-6 ${stat.color}`} />
-                    <p className="text-2xl font-black tracking-tight">{stat.val}</p>
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{stat.label}</p>
-                  </Card>
-                ))}
-             </div>
-
-             <div className="space-y-4">
-                <div className="flex items-center justify-between px-2">
-                  <h3 className="text-xl font-black uppercase tracking-tight">Images</h3>
-                  <Badge variant="outline" className="border-slate-300 font-bold">{totalImageCount} TOTAL</Badge>
-                </div>
-                {/* Free images (first 5) */}
-                {images.slice(0, isProUser ? images.length : FREE_IMAGE_LIMIT).map((image, index) => (
-                  <ImageResultCard
-                    key={image.id}
-                    image={image}
-                    onFix={async () => {
-                      if (fixCount >= FREE_IMAGE_LIMIT && !isProUser) {
-                        setShowUpgradeModal(true);
-                        return;
-                      }
-                      // Call real API to optimize
-                      try {
-                        const res = await fetch(`/api/images/${image.id}/fix`, { method: 'POST' });
-                        if (res.ok) {
-                          const optimized = await res.json();
-                          setImages(prev => prev.map(img => 
-                            img.id === image.id 
-                              ? { ...img, status: 'optimized' as const, estimatedOptimizedSize: optimized.optimizedSize || img.estimatedOptimizedSize }
-                              : img
-                          ));
-                          setFixCount(f => f + 1);
-                          toast({ title: "Image Optimized!", description: `Saved ${Math.round((image.originalSize - (optimized.optimizedSize || image.estimatedOptimizedSize)) / 1024)}KB` });
-                        }
-                      } catch (error) {
-                        toast({ title: "Optimization Failed", description: "Please try again.", variant: "destructive" });
-                      }
-                    }}
-                    onSync={async () => {
-                      try {
-                        const res = await fetch(`/api/images/${image.id}/sync`, { method: 'POST' });
-                        if (res.ok) {
-                          const synced = await res.json();
-                          setImages(prev => prev.map(img => 
-                            img.id === image.id 
-                              ? { ...img, syncStatus: 'synced' } as any
-                              : img
-                          ));
-                          toast({ title: "Synced to Store!", description: "Image has been updated in your Shopify store." });
-                        }
-                      } catch (error) {
-                        toast({ title: "Sync Failed", description: "Please try again.", variant: "destructive" });
-                      }
-                    }}
-                    isFixing={false}
-                    index={index}
-                    canFix={isProUser || fixCount < FREE_IMAGE_LIMIT}
-                  />
-                ))}
-                
-                {/* Optimize ALL button for remaining images */}
-                {!isProUser && totalImageCount > FREE_IMAGE_LIMIT && (
-                  <div className="py-8 text-center">
-                    <Button 
-                      size="lg"
-                      className="h-16 px-12 rounded-2xl bg-primary text-white font-black text-xl hover:scale-[1.02] transition-transform shadow-lg shadow-primary/30"
-                      onClick={() => setShowUpgradeModal(true)}
-                    >
-                      <Zap className="w-6 h-6 mr-2 fill-current" />
-                      Optimize ALL ({totalImageCount})
-                    </Button>
-                    <p className="text-sm text-slate-400 mt-3">
-                      +{totalImageCount - FREE_IMAGE_LIMIT} more images available with Pro
-                    </p>
-                  </div>
-                )}
-             </div>
+          <div className="flex items-center gap-3">
+            {getPlanBadge()}
+            <Badge variant="outline" className="text-xs">
+              {getUsageDisplay()}
+            </Badge>
+            {!isProUser && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs gap-1"
+                onClick={() => setShowUpgradeModal(true)}
+              >
+                <Crown className="w-3 h-3" />
+                Upgrade
+              </Button>
+            )}
           </div>
         </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-6 overflow-visible">
+        {/* Scanning State */}
+        {appState === "scanning" && (
+          <Card className="p-8 mb-6">
+            <div className="max-w-md mx-auto text-center space-y-6">
+              <div className="relative w-24 h-24 mx-auto">
+                <div className="absolute inset-0 border-4 border-primary/20 rounded-full" />
+                <div 
+                  className="absolute inset-0 border-4 border-primary rounded-full animate-spin"
+                  style={{ 
+                    clipPath: `polygon(50% 50%, 50% 0%, ${50 + 50 * Math.sin(scanStatus.progress * Math.PI / 50)}% ${50 - 50 * Math.cos(scanStatus.progress * Math.PI / 50)}%, 50% 50%)` 
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-primary">{scanStatus.progress}%</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="font-medium text-foreground">{scanStatus.message}</p>
+                <Progress value={scanStatus.progress} className="h-2" />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Main Content - Two Column Layout */}
+        {(appState === "ready" || appState === "complete") && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Left Column - Store Info & Speed (Sticky) */}
+            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-6 lg:self-start">
+              {/* Store Card */}
+              <Card className="p-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Store className="w-7 h-7 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground" data-testid="text-shop-name">
+                      {shopInfo?.name || "PROFILO"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{shopInfo?.domain}</p>
+                  </div>
+                </div>
+
+                {/* Speed Metrics */}
+                <div className="space-y-4 mb-6">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Activity className="w-4 h-4" />
+                    Store Speed
+                  </h3>
+                  
+                  {/* Latency Indicator */}
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full ${latencyStatus.color}`} />
+                        <span className="text-lg font-bold text-foreground">
+                          {shopInfo?.speedMetrics.latency || 0}ms
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium ${latencyStatus.textColor}`}>
+                        {latencyStatus.label}
+                      </span>
+                    </div>
+                    
+                    {/* Speed Scale */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-green-600 font-bold">Good</span>
+                        <span className="text-muted-foreground">&lt; 100ms</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-yellow-600 font-bold">Needs Improvement</span>
+                        <span className="text-muted-foreground">100ms - 300ms</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-red-600 font-bold">Poor</span>
+                        <span className="text-muted-foreground">&gt; 300ms</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optimize Button */}
+                {appState === "ready" && (
+                  <Button 
+                    className="w-full gap-2" 
+                    size="lg"
+                    onClick={handleScan}
+                    disabled={scanMutation.isPending}
+                    data-testid="button-optimize-now"
+                  >
+                    {scanMutation.isPending ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Zap className="w-5 h-5" />
+                    )}
+                    Start Optimization
+                  </Button>
+                )}
+
+                {appState === "complete" && (
+                  <div className="space-y-3">
+                    {pendingCount > 0 && (
+                      <Button 
+                        className="w-full gap-2" 
+                        size="lg"
+                        onClick={handleOptimizeAll}
+                        disabled={optimizeAllMutation.isPending}
+                        data-testid="button-optimize-all"
+                      >
+                        {optimizeAllMutation.isPending ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Zap className="w-5 h-5" />
+                        )}
+                        Optimize All ({pendingCount})
+                      </Button>
+                    )}
+                    {optimizedCount > 0 && (
+                      <Button 
+                        className="w-full gap-2"
+                        variant={isSynced ? "secondary" : "default"}
+                        onClick={handleSync}
+                        disabled={syncMutation.isPending || isSynced}
+                        data-testid="button-sync"
+                      >
+                        {syncMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : isSynced ? (
+                          <CheckCircle2 className="w-4 h-4" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        {isSynced ? "Synced" : "Sync to Shopify"}
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      className="w-full gap-2"
+                      onClick={handleRescan}
+                      data-testid="button-rescan"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Rescan Store
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            {/* Right Column - Dashboard & Images */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Dashboard Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-foreground" data-testid="text-optimized-count">
+                        {appState === "complete" ? optimizedCount : (shopInfo?.imagesOptimized || 0)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Optimized</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <HardDrive className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-space-saved">
+                        {formatBytes(appState === "complete" ? spaceSaved : (shopInfo?.spaceSaved || 0))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Space Saved</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {appState === "complete" ? images.length : (shopInfo?.totalImages || 0)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Total Images</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center">
+                      <Gauge className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-orange-600 dark:text-orange-400" data-testid="text-performance-score">
+                        {getPerformanceScore()}
+                      </div>
+                      <p className="text-xs text-muted-foreground">Score</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Images List */}
+              {appState === "ready" && (
+                <Card className="p-8 text-center">
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                      <Zap className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">Ready to Optimize</h3>
+                      <p className="text-muted-foreground">Click "Start Optimization" to scan your store images and find optimization opportunities.</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {appState === "complete" && images.length > 0 && (
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-foreground">Images to Optimize</h3>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{images.length} images</Badge>
+                      {!isProUser && usageRemaining < images.filter(img => img.status === "pending").length && (
+                        <Badge variant="outline" className="text-primary border-primary">
+                          <Lock className="w-3 h-3 mr-1" />
+                          {Math.max(0, pendingCount - usageRemaining)} need upgrade
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                    {images.map((image, index) => (
+                      <ImageResultCard
+                        key={image.id}
+                        image={image}
+                        onFix={() => handleFix(image.id)}
+                        isFixing={fixMutation.isPending && fixMutation.variables === image.id}
+                        index={index}
+                        isLocked={!isProUser && image.status === "pending" && usageRemaining <= 0}
+                      />
+                    ))}
+                    
+                    {/* Upgrade Section - Show when usage limit reached */}
+                    {!isProUser && usageRemaining <= 0 && pendingCount > 0 && (
+                      <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                        <div className="text-center space-y-4">
+                          <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
+                            <Crown className="w-6 h-6 text-primary" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-foreground">Monthly Limit Reached</h4>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Upgrade your plan to optimize {pendingCount} more images
+                            </p>
+                          </div>
+                          <Button 
+                            className="gap-2"
+                            onClick={() => setShowUpgradeModal(true)}
+                            data-testid="button-upgrade"
+                          >
+                            <Crown className="w-4 h-4" />
+                            View Plans
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            {billingQuery.data?.planName || "Free"}: {usageLimit} images/month | Pro: Unlimited
+                          </p>
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {appState === "complete" && images.length === 0 && (
+                <Card className="p-8 text-center">
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">All Images Optimized!</h3>
+                      <p className="text-muted-foreground">Your store images are already well optimized. No heavy images found.</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-card mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-muted-foreground">
+              © 2026 Shopimage. All rights reserved.
+            </p>
+            <div className="flex gap-6">
+              <a href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Pricing
+              </a>
+              <a href="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Privacy Policy
+              </a>
+              <a href="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Terms of Service
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+
       <UpgradeModal 
         open={showUpgradeModal} 
         onClose={() => setShowUpgradeModal(false)}
-        onSuccess={() => setIsProUser(true)}
-        shopDomain={scanResult?.shop?.domain || storeUrl}
+        onSuccess={() => {
+          // Refetch billing status to update plan
+          queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
+          setShowUpgradeModal(false);
+        }}
       />
     </div>
   );
