@@ -20,8 +20,10 @@ import { Input } from "@/components/ui/input";
 import { ImageResultCard } from "@/components/image-result-card";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
+import logoImage from "@assets/水母_1769859103227.png";
+
 // Logo URL fallback (using a placeholder or direct public path if possible)
-const LOGO_URL = "/logo.svg";
+const LOGO_URL = logoImage;
 
 interface ShopInfo {
   name: string;
