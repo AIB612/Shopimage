@@ -33,8 +33,20 @@ function generateNonce(): string {
 }
 
 function validateShopDomain(shop: string): boolean {
+  // Accept myshopify.com domains
   const shopRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/;
-  return shopRegex.test(shop);
+  if (shopRegex.test(shop)) return true;
+  
+  // Also accept just the store name (will append .myshopify.com)
+  const storeNameRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*$/;
+  return storeNameRegex.test(shop);
+}
+
+function normalizeShopDomain(shop: string): string {
+  // If already has .myshopify.com, return as is
+  if (shop.endsWith('.myshopify.com')) return shop;
+  // Otherwise append it
+  return `${shop}.myshopify.com`;
 }
 
 function verifyHmac(query: Record<string, any>): boolean {

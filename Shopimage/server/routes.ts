@@ -817,13 +817,22 @@ export async function registerRoutes(
 
   // ============ Extension API ============
   
+  // Helper to normalize shop domain
+  function normalizeShopDomain(shop: string): string {
+    if (shop.endsWith('.myshopify.com')) return shop;
+    return `${shop}.myshopify.com`;
+  }
+  
   // Check auth status for extension
   app.get("/api/extension/auth-status", async (req, res) => {
-    const { platform, shop } = req.query;
+    const { platform, shop: rawShop } = req.query;
     
-    if (!shop || typeof shop !== 'string') {
+    if (!rawShop || typeof rawShop !== 'string') {
       return res.json({ authorized: false, error: 'Missing shop parameter' });
     }
+    
+    const shop = normalizeShopDomain(rawShop);
+    console.log('[Extension] Auth check for:', shop);
     
     try {
       const shopData = await storage.getShopByDomain(shop);
@@ -838,7 +847,7 @@ export async function registerRoutes(
           return res.json({ authorized: true, shop: shop });
         }
       }
-      return res.json({ authorized: false });
+      return res.json({ authorized: false, shop: shop });
     } catch (error) {
       console.error('[Extension] Auth check error:', error);
       return res.json({ authorized: false, error: String(error) });
@@ -847,11 +856,14 @@ export async function registerRoutes(
 
   // Upload optimized image from extension
   app.post("/api/extension/upload", async (req, res) => {
-    const { platform, shop, filename, image, contentType, productId } = req.body;
+    const { platform, shop: rawShop, filename, image, contentType, productId } = req.body;
     
-    if (!shop || !image) {
+    if (!rawShop || !image) {
       return res.status(400).json({ error: 'Missing shop or image data' });
     }
+    
+    const shop = normalizeShopDomain(rawShop);
+    console.log('[Extension] Upload to:', shop, 'file:', filename);
     
     try {
       const shopData = await storage.getShopByDomain(shop);
