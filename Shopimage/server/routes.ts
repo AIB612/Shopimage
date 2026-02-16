@@ -368,8 +368,11 @@ export async function registerRoutes(
         });
       }
 
-      // Fetch Web Vitals in parallel (don't block on this)
-      const webVitals = await fetchWebVitals(domain);
+      // Start Web Vitals fetch in background (don't block scan)
+      const webVitalsPromise = fetchWebVitals(domain).catch(e => {
+        console.log('[PageSpeed] Background fetch failed:', e.message);
+        return { lcp: null, inp: null, cls: null, performanceScore: 0, status: 'needs-improvement' as const };
+      });
       
       await storage.deleteImageLogsByShopId(shop.id);
       
@@ -395,6 +398,9 @@ export async function registerRoutes(
       const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0);
       const estimatedSavings = totalOriginalSize * 0.7; // Assume 70% reduction
       const potentialTimeSaved = (estimatedSavings / (1024 * 1024)) * 0.1; // ~0.1s per MB saved
+
+      // Wait for Web Vitals (should be done by now, or use defaults)
+      const webVitals = await webVitalsPromise;
 
       const result: ScanResult = {
         shop,
