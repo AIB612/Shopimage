@@ -815,6 +815,196 @@ export async function registerRoutes(
   app.post("/api/shopify/billing/subscribe", createBillingSubscription);
   app.get("/api/shopify/billing/callback", handleBillingCallback);
 
+  // ============ Extension API ============
+  
+  // Check auth status for extension
+  app.get("/api/extension/auth-status", async (req, res) => {
+    const { platform, shop } = req.query;
+    
+    if (!shop || typeof shop !== 'string') {
+      return res.json({ authorized: false, error: 'Missing shop parameter' });
+    }
+    
+    try {
+      const shopData = await storage.getShopByDomain(shop);
+      if (shopData && shopData.accessToken) {
+        // Verify token is still valid
+        const testUrl = `https://${shop}/admin/api/2024-01/shop.json`;
+        const testResp = await fetch(testUrl, {
+          headers: { 'X-Shopify-Access-Token': shopData.accessToken }
+        });
+        
+        if (testResp.ok) {
+          return res.json({ authorized: true, shop: shop });
+        }
+      }
+      return res.json({ authorized: false });
+    } catch (error) {
+      console.error('[Extension] Auth check error:', error);
+      return res.json({ authorized: false, error: String(error) });
+    }
+  });
+
+  // Upload optimized image from extension
+  app.post("/api/extension/upload", async (req, res) => {
+    const { platform, shop, filename, image, contentType, productId } = req.body;
+    
+    if (!shop || !image) {
+      return res.status(400).json({ error: 'Missing shop or image data' });
+    }
+    
+    try {
+      const shopData = await storage.getShopByDomain(shop);
+      if (!shopData || !shopData.accessToken) {
+        return res.status(401).json({ error: 'Shop not authorized', needsInstall: true });
+      }
+      
+      // For now, we'll upload to Shopify Files API
+      // In production, you might want to update specific product images
+      const uploadUrl = `https://${shop}/admin/api/2024-01/files.json`;
+      
+      // Shopify expects staged upload, but for simplicity we'll use GraphQL
+      const graphqlUrl = `https://${shop}/admin/api/2024-01/graphql.json`;
+      
+      // Create staged upload
+      const stagedUploadQuery = `
+        mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
+          stagedUploadsCreate(input: $input) {
+            stagedTargets {
+              url
+              resourceUrl
+              parameters {
+                name
+                value
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+      
+      const stagedResp = await fetch(graphqlUrl, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': shopData.accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: stagedUploadQuery,
+          variables: {
+            input: [{
+              filename: filename,
+              mimeType: contentType || 'image/webp',
+              resource: 'FILE',
+              fileSize: Buffer.from(image, 'base64').length.toString()
+            }]
+          }
+        })
+      });
+      
+      const stagedData = await stagedResp.json();
+      
+      if (stagedData.data?.stagedUploadsCreate?.userErrors?.length > 0) {
+        return res.status(400).json({ 
+          error: stagedData.data.stagedUploadsCreate.userErrors[0].message 
+        });
+      }
+      
+      const target = stagedData.data?.stagedUploadsCreate?.stagedTargets?.[0];
+      if (!target) {
+        return res.status(500).json({ error: 'Failed to create staged upload' });
+      }
+      
+      // Upload to staged URL
+      const formData = new FormData();
+      target.parameters.forEach((param: { name: string; value: string }) => {
+        formData.append(param.name, param.value);
+      });
+      
+      const imageBuffer = Buffer.from(image, 'base64');
+      const blob = new Blob([imageBuffer], { type: contentType || 'image/webp' });
+      formData.append('file', blob, filename);
+      
+      const uploadResp = await fetch(target.url, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadResp.ok) {
+        return res.status(500).json({ error: 'Failed to upload file' });
+      }
+      
+      // Create file in Shopify
+      const createFileQuery = `
+        mutation fileCreate($files: [FileCreateInput!]!) {
+          fileCreate(files: $files) {
+            files {
+              id
+              alt
+              createdAt
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+      
+      const createResp = await fetch(graphqlUrl, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': shopData.accessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: createFileQuery,
+          variables: {
+            files: [{
+              originalSource: target.resourceUrl,
+              alt: filename.replace(/\.[^.]+$/, '')
+            }]
+          }
+        })
+      });
+      
+      const createData = await createResp.json();
+      
+      if (createData.data?.fileCreate?.userErrors?.length > 0) {
+        return res.status(400).json({ 
+          error: createData.data.fileCreate.userErrors[0].message 
+        });
+      }
+      
+      const file = createData.data?.fileCreate?.files?.[0];
+      
+      // Log the optimization
+      await storage.createImageLog({
+        shopId: shopData.id,
+        imageUrl: target.resourceUrl,
+        imageName: filename,
+        originalSize: imageBuffer.length,
+        optimizedSize: imageBuffer.length,
+        format: 'WEBP',
+        status: 'optimized',
+        shopifyAssetId: file?.id || null
+      });
+      
+      return res.json({ 
+        success: true, 
+        fileId: file?.id,
+        resourceUrl: target.resourceUrl
+      });
+      
+    } catch (error) {
+      console.error('[Extension] Upload error:', error);
+      return res.status(500).json({ error: String(error) });
+    }
+  });
+
   // Admin: manually set shop token (for Custom apps)
   app.post("/api/admin/shop-token", async (req, res) => {
     const { domain, accessToken, adminKey } = req.body;

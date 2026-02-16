@@ -12,7 +12,7 @@ const SCOPES = "read_products,write_products,read_themes,write_themes";
 const NONCE_EXPIRY_MS = 10 * 60 * 1000;
 const MAX_TIMESTAMP_AGE_SEC = 60;
 
-const nonceStore = new Map<string, { shop: string; createdAt: number }>();
+const nonceStore = new Map<string, { shop: string; createdAt: number; returnTo?: string }>();
 
 function getBaseUrl(): string {
   // Support Render environment
@@ -102,7 +102,7 @@ function validateNonce(nonce: string, shop: string): boolean {
 
 export async function handleInstall(req: Request, res: Response) {
   try {
-    const { shop } = req.query;
+    const { shop, returnTo } = req.query;
 
     if (!shop || typeof shop !== "string") {
       return res.status(400).json({ error: "Missing shop parameter" });
@@ -117,7 +117,11 @@ export async function handleInstall(req: Request, res: Response) {
     }
 
     const nonce = generateNonce();
+    // Include returnTo in nonce data for extension flow
     storeNonce(nonce, shop);
+    if (returnTo === 'extension') {
+      nonceStore.set(nonce, { shop, createdAt: Date.now(), returnTo: 'extension' });
+    }
     
     const baseUrl = getBaseUrl();
     const redirectUri = `${baseUrl}/api/shopify/callback`;
@@ -217,6 +221,54 @@ export async function handleCallback(req: Request, res: Response) {
     }
 
     console.log("[Shopify OAuth] Shop saved successfully!");
+    
+    // Check if this was from extension
+    const storedNonce = nonceStore.get(state);
+    if (storedNonce?.returnTo === 'extension') {
+      // Return a page that tells extension auth is complete
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Shopimage - Connected!</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+              color: white;
+              text-align: center;
+            }
+            .container {
+              padding: 40px;
+              background: white;
+              border-radius: 16px;
+              color: #374151;
+              max-width: 400px;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            }
+            .icon { font-size: 64px; margin-bottom: 16px; }
+            h1 { font-size: 24px; margin: 0 0 8px; }
+            p { color: #6b7280; margin: 8px 0; }
+            .hint { font-size: 13px; color: #9ca3af; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="icon">✅</div>
+            <h1>Connected to Shopify!</h1>
+            <p>Your store <strong>${shop}</strong> is now connected.</p>
+            <p class="hint">Return to the Shopimage extension to continue syncing your images.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
     const baseUrl = getBaseUrl();
     res.redirect(`${baseUrl}/?shop=${encodeURIComponent(shop)}&installed=true`);
   } catch (error) {

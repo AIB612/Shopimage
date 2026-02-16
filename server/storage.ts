@@ -20,6 +20,8 @@ export interface IStorage {
   updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog>;
   getImageLogById(id: string): Promise<ImageLog | undefined>;
   deleteImageLogsByShopId(shopId: string): Promise<void>;
+  getUsage(shopId: string): Promise<{ count: number } | undefined>;
+  updateShopSyncTime(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -110,6 +112,18 @@ export class DatabaseStorage implements IStorage {
 
   async deleteImageLogsByShopId(shopId: string): Promise<void> {
     await db.delete(imageLogs).where(eq(imageLogs.shopId, shopId));
+  }
+
+  async getUsage(shopId: string): Promise<{ count: number } | undefined> {
+    const shop = await this.getShopById(shopId);
+    if (shop) {
+      return { count: shop.imagesOptimizedThisMonth || 0 };
+    }
+    return undefined;
+  }
+
+  async updateShopSyncTime(id: string): Promise<void> {
+    await db.update(shops).set({ lastScanAt: new Date() }).where(eq(shops.id, id));
   }
 }
 

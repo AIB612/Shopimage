@@ -506,5 +506,102 @@ export async function registerRoutes(
     await handleBillingStatus(req, res);
   });
 
+  // ============ Dashboard & Sync Endpoints ============
+
+  // Get usage stats
+  app.get("/api/usage", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Get shop by token/session
+      const shop = await storage.getShopByDomain(token);
+      if (shop) {
+        const usage = await storage.getUsage(shop.id);
+        return res.json({
+          used: usage?.count || 0,
+          limit: shop.plan === "pro" ? 999999 : shop.plan === "basic" ? 999999 : 10,
+          plan: shop.plan || "free"
+        });
+      }
+      
+      // Default for new users
+      return res.json({ used: 0, limit: 10, plan: "free" });
+    } catch (error) {
+      console.error("Usage error:", error);
+      return res.status(500).json({ message: "Failed to get usage" });
+    }
+  });
+
+  // Get sync status for all platforms
+  app.get("/api/sync/status", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const shop = await storage.getShopByDomain(token);
+      
+      // Check Shopify connection (uses accessToken field)
+      const shopifyConnected = shop?.accessToken ? true : false;
+      const shopifyImages = shop ? await storage.getImageLogsByShopId(shop.id) : [];
+      
+      return res.json({
+        shopify: {
+          connected: shopifyConnected,
+          lastSync: shop?.lastScanAt || null,
+          imageCount: shopifyImages.length
+        },
+        woocommerce: {
+          connected: false,
+          lastSync: null,
+          imageCount: 0
+        }
+      });
+    } catch (error) {
+      console.error("Sync status error:", error);
+      return res.status(500).json({ message: "Failed to get sync status" });
+    }
+  });
+
+  // Trigger Shopify sync
+  app.post("/api/sync/shopify", async (req, res) => {
+    try {
+      const token = req.headers.authorization?.replace("Bearer ", "");
+      if (!token) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const shop = await storage.getShopByDomain(token);
+      if (!shop || !shop.accessToken) {
+        return res.status(400).json({ message: "Shopify not connected" });
+      }
+
+      // Fetch and sync products from Shopify
+      const products = await fetchShopifyProducts(shop.domain);
+      
+      // Update last sync time
+      await storage.updateShopSyncTime(shop.id);
+      
+      return res.json({ 
+        success: true, 
+        message: "Sync completed",
+        imageCount: products.length 
+      });
+    } catch (error) {
+      console.error("Shopify sync error:", error);
+      return res.status(500).json({ message: "Sync failed" });
+    }
+  });
+
+  // Connect Shopify (redirect to OAuth)
+  app.get("/api/shopify/connect", async (req, res) => {
+    // Redirect to Shopify install flow
+    res.redirect("/api/shopify/install");
+  });
+
   return httpServer;
 }
