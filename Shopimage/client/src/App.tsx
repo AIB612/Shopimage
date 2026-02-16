@@ -13,8 +13,8 @@ import Pricing from "@/pages/pricing";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Landing} />
-      <Route path="/app" component={Home} />
+      <Route path="/" component={Home} />
+      <Route path="/landing" component={Landing} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/pricing" component={Pricing} />
