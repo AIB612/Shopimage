@@ -9,11 +9,13 @@ import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Pricing from "@/pages/pricing";
 import Dashboard from "@/pages/dashboard";
+import Landing from "@/pages/landing";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/landing" component={Landing} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/pricing" component={Pricing} />
