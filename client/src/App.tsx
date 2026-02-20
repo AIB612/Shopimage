@@ -10,6 +10,7 @@ import Terms from "@/pages/terms";
 import Pricing from "@/pages/pricing";
 import Dashboard from "@/pages/dashboard";
 import Landing from "@/pages/landing";
+import FAQ from "@/pages/faq";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/faq" component={FAQ} />
       <Route component={NotFound} />
     </Switch>
   );
