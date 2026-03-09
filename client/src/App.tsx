@@ -11,6 +11,7 @@ import Pricing from "@/pages/pricing";
 import Dashboard from "@/pages/dashboard";
 import Landing from "@/pages/landing";
 import FAQ from "@/pages/faq";
+import EventMerch from "@/pages/EventMerch";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/faq" component={FAQ} />
+      <Route path="/eventmerch" component={EventMerch} />
       <Route component={NotFound} />
     </Switch>
   );

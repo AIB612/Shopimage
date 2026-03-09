@@ -817,5 +817,16 @@ export async function registerRoutes(
     res.redirect("/api/shopify/install");
   });
 
+  // ============ EventMerch Routes ============
+  
+  // Import EventMerch routes
+  const eventmerchEventsRouter = (await import("./routes/eventmerch/events")).default;
+  const eventmerchDesignsRouter = (await import("./routes/eventmerch/designs")).default;
+  const eventmerchPhotosRouter = (await import("./routes/eventmerch/photos")).default;
+  
+  app.use("/api/eventmerch/events", eventmerchEventsRouter);
+  app.use("/api/eventmerch/designs", eventmerchDesignsRouter);
+  app.use("/api/eventmerch/photos", eventmerchPhotosRouter);
+
   return httpServer;
 }
