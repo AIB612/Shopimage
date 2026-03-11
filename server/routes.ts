@@ -505,7 +505,7 @@ export async function registerRoutes(
       const heavyImages = images.filter(img => img.originalSize > 500 * 1024);
       const totalSize = heavyImages.reduce((sum, img) => sum + img.originalSize, 0);
       const potentialSavings = heavyImages.reduce((sum, img) => {
-        const estimatedOptimized = img.originalSize * 0.2;
+        const estimatedOptimized = img.originalSize * 0.65;
         return sum + (img.originalSize - estimatedOptimized);
       }, 0);
       const potentialTimeSaved = potentialSavings / (1.5 * 1024 * 1024);
@@ -548,7 +548,7 @@ export async function registerRoutes(
         });
       }
 
-      const optimizedSize = Math.round(imageLog.originalSize * 0.2);
+      const optimizedSize = Math.round(imageLog.originalSize * 0.65);
       
       const updated = await storage.updateImageLogStatus(id, "optimized", optimizedSize);
       
