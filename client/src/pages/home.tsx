@@ -172,9 +172,9 @@ export default function Home() {
           imageUrl: img.imageUrl,
           imageName: img.imageName,
           originalSize: img.originalSize,
-          estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.2),
+          estimatedOptimizedSize: img.optimizedSize || Math.round(img.originalSize * 0.65),
           format: img.format,
-          timeSaved: ((img.originalSize - (img.optimizedSize || img.originalSize * 0.2)) / 1024 / 1024) / 1.5,
+          timeSaved: ((img.originalSize - (img.optimizedSize || img.originalSize * 0.65)) / 1024 / 1024) / 1.5,
           status: img.status,
         }));
         setImages(analysisImages);
@@ -252,7 +252,7 @@ export default function Home() {
           const optimizedIds = new Set(data.images?.map((img: any) => img.id) || []);
           return prev.map(img => 
             optimizedIds.has(img.id) 
-              ? { ...img, status: "optimized" as const, estimatedOptimizedSize: Math.round(img.originalSize * 0.2) }
+              ? { ...img, status: "optimized" as const, estimatedOptimizedSize: Math.round(img.originalSize * 0.65) }
               : img
           );
         });

@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
-import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal_service";
 import { handleInstall, handleCallback, getShopSession } from "./shopify";
 import { 
   handleGetPlans, 
@@ -219,7 +218,8 @@ async function fetchPublicWebsiteImages(url: string): Promise<Array<{
           }
           
           // Calculate potential optimized size (WebP conversion + compression)
-          const compressionRatio = format === "PNG" ? 0.25 : format === "WEBP" ? 0.85 : 0.35;
+          // Realistic compression ratios: PNG->WebP: 35%, WEBP: 15%, JPEG: 25%
+          const compressionRatio = format === "PNG" ? 0.65 : format === "WEBP" ? 0.85 : 0.75;
           const optimizedSize = Math.round(originalSize * compressionRatio);
           
           // Extract filename
@@ -276,7 +276,7 @@ function generateDemoScanImages(): Array<{
   ];
 
   return demoImages.map((img, index) => {
-    const compressionRatio = img.format === "PNG" ? 0.25 : 0.35;
+    const compressionRatio = img.format === "PNG" ? 0.65 : 0.75;
     const optimizedSize = Math.round(img.size * compressionRatio);
     return {
       id: `demo_${index}_${Date.now()}`,
@@ -589,7 +589,8 @@ export async function registerRoutes(
       let totalSaved = 0;
       
       for (const img of imagesToOptimize) {
-        const optimizedSize = Math.round(img.originalSize * 0.2);
+        // More realistic WebP compression: 30-40% reduction
+        const optimizedSize = Math.round(img.originalSize * 0.65);
         const updated = await storage.updateImageLogStatus(img.id, "optimized", optimizedSize);
         optimizedImages.push(updated);
         totalSaved += img.originalSize - optimizedSize;
@@ -671,19 +672,6 @@ export async function registerRoutes(
       console.error("Get shop error:", error);
       return res.status(500).json({ message: "Failed to get shop data" });
     }
-  });
-
-  // PayPal integration routes
-  app.get("/api/paypal/setup", async (req, res) => {
-    await loadPaypalDefault(req, res);
-  });
-
-  app.post("/api/paypal/order", async (req, res) => {
-    await createPaypalOrder(req, res);
-  });
-
-  app.post("/api/paypal/order/:orderID/capture", async (req, res) => {
-    await capturePaypalOrder(req, res);
   });
 
   // Shopify OAuth routes

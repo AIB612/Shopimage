@@ -46,7 +46,7 @@ export default function Privacy() {
               <li>Store domain and name</li>
               <li>Product image URLs and metadata (file sizes, dimensions)</li>
               <li>Usage data (scans performed, images optimized)</li>
-              <li>Payment information (processed securely via PayPal)</li>
+              <li>Payment information (processed securely via Shopify)</li>
             </ul>
           </section>
 
@@ -73,7 +73,7 @@ export default function Privacy() {
             <p className="text-gray-600 mb-3">We use the following third-party services:</p>
             <ul className="list-disc list-inside text-gray-600 space-y-2 ml-2">
               <li><strong>Shopify:</strong> To access your store data via their Admin API</li>
-              <li><strong>PayPal:</strong> To process subscription payments</li>
+              <li><strong>Shopify Billing API:</strong> To process subscription payments</li>
               <li><strong>Google PageSpeed API:</strong> To analyze page performance</li>
               <li><strong>Render:</strong> To host our application</li>
             </ul>

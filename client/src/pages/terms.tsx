@@ -62,7 +62,7 @@ export default function Terms() {
             <p className="text-gray-600 mb-3">Our service offers free and paid subscription plans:</p>
             <ul className="list-disc list-inside text-gray-600 space-y-2 ml-2">
               <li>Free plan: Limited to 50 images per month</li>
-              <li>Paid plans: Billed monthly via PayPal</li>
+              <li>Paid plans: Billed monthly via Shopify</li>
               <li>Subscriptions auto-renew unless cancelled</li>
               <li>Refunds are handled on a case-by-case basis</li>
             </ul>
