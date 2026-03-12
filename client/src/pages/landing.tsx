@@ -11,8 +11,9 @@ export default function Landing() {
           <span className="text-2xl">💧</span>
           <span className="text-xl font-bold text-violet-700">Shopimage</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <Link href="/pricing" className="text-gray-600 hover:text-violet-700">Pricing</Link>
+          <Link href="/faq" className="text-gray-600 hover:text-violet">FAQ</Link>
           <a 
             href="https://apps.shopify.com/shopimage" 
             target="_blank"
@@ -221,15 +222,15 @@ export default function Landing() {
                 <span className="text-xl font-bold text-white">Shopimage</span>
               </div>
               <p className="text-sm">
-                The fastest way to optimize your Shopify store images.
+                The fastest way to optimize your Shopify store images. Boost speed, SEO, and conversions.
               </p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/pricing" className="hover:text-white">Pricing</Link></li>
-                <li><a href="https://apps.shopify.com/shopimage" className="hover:text-white">Shopify App</a></li>
-                <li><a href="#" className="hover:text-white">Chrome Extension</a></li>
+                <li><Link href="/faq" className="hover:text-white">FAQ</Link></li>
+                <li><a href="https://apps.shopify.com/shopimage" target="_blank" rel="noopener noreferrer" className="hover:text-white">Shopify App Store</a></li>
               </ul>
             </div>
             <div>
@@ -243,6 +244,7 @@ export default function Landing() {
               <h4 className="text-white font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
                 <li><a href="mailto:support@shopimage.app" className="hover:text-white">Contact Us</a></li>
+                <li><Link href="/faq" className="hover:text-white">Help Center</Link></li>
               </ul>
             </div>
           </div>
