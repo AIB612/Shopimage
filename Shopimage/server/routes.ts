@@ -499,13 +499,25 @@ export async function registerRoutes(
         (updated as any).optimizedData = optimizedBase64;
         (updated as any).optimizedFormat = 'webp';
         
-        return res.json({ ...updated, savings: `${savings}%` });
+        // Note: This size is calculated locally. After syncing to Shopify,
+        // the actual size may differ slightly due to Shopify's processing.
+        // The size will be updated to match Shopify's actual size after sync.
+        return res.json({ 
+          ...updated, 
+          savings: `${savings}%`,
+          isEstimated: true, // Flag to indicate this size may change after sync
+          note: "Size will be verified after sync to Shopify"
+        });
       } catch (optimizeError) {
         console.error('[Optimize] Sharp error:', optimizeError);
         // Fallback to estimated optimization if Sharp fails
         const optimizedSize = Math.round(imageLog.originalSize * 0.25);
         const updated = await storage.updateImageLogStatus(id, "optimized", optimizedSize);
-        return res.json(updated);
+        return res.json({ 
+          ...updated,
+          isEstimated: true,
+          note: "Estimated size - will be verified after sync"
+        });
       }
     } catch (error) {
       console.error('[Optimize] Error:', error);
