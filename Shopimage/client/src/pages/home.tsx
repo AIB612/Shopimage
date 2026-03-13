@@ -671,24 +671,12 @@ export default function Home() {
                         const res = await fetch(`/api/images/${image.id}/sync`, { method: 'POST' });
                         if (res.ok) {
                           const synced = await res.json();
-                          // Update with actual size from Shopify after sync
                           setImages(prev => prev.map(img => 
                             img.id === image.id 
-                              ? { 
-                                  ...img, 
-                                  syncStatus: 'synced',
-                                  // Update to actual size from Shopify if available
-                                  estimatedOptimizedSize: synced.optimizedSize || synced.actualSize || img.estimatedOptimizedSize,
-                                  optimizedSize: synced.optimizedSize || synced.actualSize || img.optimizedSize
-                                } as any
+                              ? { ...img, syncStatus: 'synced' } as any
                               : img
                           ));
-                          toast({ 
-                            title: "Synced to Store!", 
-                            description: synced.actualSize 
-                              ? `Image updated with actual size: ${Math.round(synced.actualSize / 1024)}KB`
-                              : "Image has been updated in your Shopify store."
-                          });
+                          toast({ title: "Synced to Store!", description: "Image has been updated in your Shopify store." });
                         }
                       } catch (error) {
                         toast({ title: "Sync Failed", description: "Please try again.", variant: "destructive" });
