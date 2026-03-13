@@ -343,7 +343,8 @@ export default function Home() {
           <div className="w-16 h-16 bg-black rounded-3xl mb-4 mx-auto flex items-center justify-center animate-pulse">
              <Sparkles className="text-white w-8 h-8" />
           </div>
-          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Waking up...</p>
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Connecting to your store...</p>
+          <p className="text-xs text-slate-400 mt-2">This may take a few seconds</p>
         </div>
       </div>
     );
