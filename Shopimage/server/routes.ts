@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
 import { handleInstall, handleCallback, getShopSession, createBillingSubscription, handleBillingCallback } from "./shopify";
+import crypto from "crypto";
 
 const scanRequestSchema = z.object({
   url: z.string().url().or(z.string().min(1)),
@@ -701,8 +702,6 @@ export async function registerRoutes(
 
   // GDPR mandatory webhooks (Shopify requirement)
   // These webhooks must verify HMAC signature from Shopify
-  
-  const crypto = require('crypto');
   
   function verifyShopifyWebhook(req: any): boolean {
     const hmacHeader = req.get('X-Shopify-Hmac-Sha256');
