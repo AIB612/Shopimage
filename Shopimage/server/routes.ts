@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
-import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
 import { handleInstall, handleCallback, getShopSession, createBillingSubscription, handleBillingCallback } from "./shopify";
 import crypto from "crypto";
 
@@ -807,10 +806,6 @@ export async function registerRoutes(
   });
 
   // PayPal routes
-  app.get("/api/paypal/setup", loadPaypalDefault);
-  app.post("/api/paypal/order", createPaypalOrder);
-  app.post("/api/paypal/order/:orderID/capture", capturePaypalOrder);
-
   // Shopify OAuth routes
   app.get("/api/shopify/install", handleInstall);
   app.get("/api/shopify/callback", handleCallback);
