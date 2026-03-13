@@ -1,6 +1,8 @@
+import { PageLayout } from "@/components/PageLayout";
+
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-background">
+    <PageLayout>
       <div className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">Privacy Policy</h1>
         <p className="text-sm text-muted-foreground mb-8">Last updated: February 10, 2026</p>
@@ -95,6 +97,6 @@ export default function Privacy() {
           </section>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }
