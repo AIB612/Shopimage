@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ScanResult, ImageLog } from "@shared/schema";
 import { handleInstall, handleCallback, getShopSession, createBillingSubscription, handleBillingCallback } from "./shopify";
 import crypto from "crypto";
+import sharp from "sharp";
 
 const scanRequestSchema = z.object({
   url: z.string().url().or(z.string().min(1)),
@@ -432,7 +433,6 @@ export async function registerRoutes(
       if (!imageLog) return res.status(404).send();
       
       // Real image optimization using Sharp
-      const sharp = require('sharp');
       
       try {
         // Download the original image
@@ -534,7 +534,6 @@ export async function registerRoutes(
       // Check if we have optimized data stored
       if (!imageLog.optimizedData) {
         // Re-optimize the image
-        const sharp = require('sharp');
         console.log(`[Sync] Re-optimizing image for sync: ${imageLog.imageUrl}`);
         
         const imageResponse = await fetch(imageLog.imageUrl);
