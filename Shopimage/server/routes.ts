@@ -78,8 +78,8 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[Shopify] API error for ${domain}:`, response.status, errorText);
-      // Only 401 means token is invalid and needs reinstall
-      // 403 usually means Protected Customer Data policy - app needs approval, not reinstall
+      
+      // 401: Token is invalid, needs reinstall
       if (response.status === 401) {
         return {
           needsInstall: true,
@@ -87,10 +87,23 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
           images: []
         };
       }
-      // For 403 and other errors, return empty but don't ask for reinstall
-      // This prevents infinite redirect loops
-      console.log(`[Shopify] API returned ${response.status} - may need Protected Customer Data approval in Shopify Partners`);
-      return { needsInstall: false, images: [], error: `API error: ${response.status}` };
+      
+      // 403: Usually means Protected Customer Data policy - app needs approval
+      if (response.status === 403) {
+        console.log(`[Shopify] 403 Forbidden - may need Protected Customer Data approval in Shopify Partners`);
+        return { 
+          needsInstall: false, 
+          images: [], 
+          error: `Access denied. Please ensure the app has the required permissions in your Shopify Partners dashboard.` 
+        };
+      }
+      
+      // Other errors
+      return { 
+        needsInstall: false, 
+        images: [], 
+        error: `Shopify API error: ${response.status}. Please try again or contact support.` 
+      };
     }
 
     const data = await response.json() as { products: ShopifyProduct[] };
@@ -362,10 +375,17 @@ export async function registerRoutes(
         });
       }
 
+      // If API error occurred
+      if (shopifyResult.error) {
+        return res.status(400).json({ 
+          message: shopifyResult.error
+        });
+      }
+
       // If no images found
       if (shopifyResult.images.length === 0) {
         return res.status(404).json({ 
-          message: "No product images found in your store"
+          message: "No product images found in your store. Please add some products with images first."
         });
       }
 
