@@ -604,7 +604,10 @@ export async function registerRoutes(
       const result = await updateResponse.json();
       console.log(`[Sync] Successfully synced image ${shopifyImageId} to Shopify`);
       
-      // Verify the actual file size after sync
+      // CRITICAL: Always verify and use the actual file size from Shopify after sync
+      // This ensures the displayed size matches exactly what's on Shopify
+      let actualSizeNum = imageLog.optimizedSize; // Fallback to our calculated size
+      
       try {
         const verifyResponse = await fetch(apiUrl, {
           method: 'GET',
@@ -624,24 +627,36 @@ export async function registerRoutes(
             const actualSize = sizeResponse.headers.get('content-length');
             
             if (actualSize) {
-              const actualSizeNum = parseInt(actualSize, 10);
-              console.log(`[Sync] Actual size after sync: ${actualSizeNum} bytes (expected: ${imageLog.optimizedSize} bytes)`);
+              actualSizeNum = parseInt(actualSize, 10);
+              console.log(`[Sync] Actual size from Shopify: ${actualSizeNum} bytes (our calculation: ${imageLog.optimizedSize} bytes)`);
               
-              // Update with actual size if different
-              if (Math.abs(actualSizeNum - imageLog.optimizedSize) > 1024) { // More than 1KB difference
-                console.log(`[Sync] Size mismatch detected, updating to actual size`);
+              // ALWAYS update to actual size from Shopify, regardless of difference
+              // This ensures 100% accuracy with what's actually stored
+              if (actualSizeNum !== imageLog.optimizedSize) {
+                const diff = actualSizeNum - imageLog.optimizedSize;
+                console.log(`[Sync] Updating size to match Shopify exactly (diff: ${diff > 0 ? '+' : ''}${diff} bytes)`);
                 await storage.updateImageLogStatus(id, "optimized", actualSizeNum);
+              } else {
+                console.log(`[Sync] Size matches perfectly!`);
               }
             }
           }
         }
       } catch (verifyError) {
-        console.log(`[Sync] Could not verify actual size:`, verifyError);
-        // Continue anyway - sync was successful
+        console.error(`[Sync] Could not verify actual size:`, verifyError);
+        // Continue anyway - sync was successful, but we'll use our calculated size
       }
 
       const updated = await storage.updateImageLogSyncStatus(id, "synced");
-      return res.json({ ...updated, message: "Successfully synced to Shopify", shopifyResult: result });
+      
+      // Return the updated image with actual size
+      const finalImage = await storage.getImageLogById(id);
+      return res.json({ 
+        ...finalImage, 
+        message: "Successfully synced to Shopify", 
+        actualSize: actualSizeNum,
+        shopifyResult: result 
+      });
     } catch (error) {
       console.error("Sync error:", error);
       return res.status(500).json({ message: "Sync failed", error: String(error) });
