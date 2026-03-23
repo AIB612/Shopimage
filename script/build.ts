@@ -30,12 +30,10 @@ const allowlist = [
   "xlsx",
   "zod",
   "zod-validation-error",
+  "@paypal/paypal-server-sdk",
 ];
 
 async function buildAll() {
-  console.log("----------------------------------------");
-  console.log("BUILD SCRIPT RUNNING: ESM MODE (UPDATED)");
-  console.log("----------------------------------------");
   await rm("dist", { recursive: true, force: true });
 
   console.log("building client...");
@@ -53,17 +51,14 @@ async function buildAll() {
     entryPoints: ["server/index.ts"],
     platform: "node",
     bundle: true,
-    format: "esm",  // <--- CHANGED from 'cjs' to 'esm'
-    outfile: "dist/index.js", // <--- CHANGED extension to .js (standard for ESM)
+    format: "cjs",
+    outfile: "dist/index.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
     external: externals,
     logLevel: "info",
-    banner: {
-      js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);", // <--- ADDED to support CommonJS imports in ESM
-    },
   });
 }
 

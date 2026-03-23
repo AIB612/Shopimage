@@ -2,16 +2,19 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "@shared/schema";
 
-let db: ReturnType<typeof drizzle> | null = null;
+const dbUrl = process.env.DATABASE_URL;
 
-if (process.env.DATABASE_URL) {
-  const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-  });
-  db = drizzle(pool, { schema });
-  console.log("[DB] Connected to PostgreSQL");
-} else {
-  console.log("[DB] No DATABASE_URL, running without database");
+if (!dbUrl) {
+  console.error("[DATABASE] FATAL ERROR: DATABASE_URL is not set in Environment Variables!");
 }
 
-export { db };
+const pool = new pg.Pool({
+  connectionString: dbUrl || "postgres://dummy:dummy@localhost:5432/dummy",
+});
+
+pool.on('error', (err) => {
+  console.error("[DATABASE] Pool Error:", err.message);
+});
+
+export const db = drizzle(pool, { schema });
+console.log("[DATABASE] Connection pool created.");

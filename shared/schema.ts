@@ -4,8 +4,6 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const imageStatusEnum = pgEnum("image_status", ["pending", "optimized", "reverted"]);
-export const planEnum = pgEnum("plan", ["free", "basic", "pro"]);
-export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "cancelled", "expired", "pending"]);
 
 export const shops = pgTable("shops", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -13,31 +11,29 @@ export const shops = pgTable("shops", {
   accessToken: text("access_token"),
   scope: text("scope"),
   isPro: integer("is_pro").default(0),
-  // Subscription fields
-  plan: planEnum("plan").default("free"),
-  subscriptionId: text("subscription_id"), // Shopify charge ID
-  subscriptionStatus: subscriptionStatusEnum("subscription_status").default("active"),
-  billingOn: timestamp("billing_on"), // Next billing date
-  // Usage tracking
-  imagesOptimizedThisMonth: integer("images_optimized_this_month").default(0),
-  usageResetAt: timestamp("usage_reset_at"),
   lastScanAt: timestamp("last_scan_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const syncStatusEnum = pgEnum("sync_status", ["pending", "synced", "failed"]);
 
 export const imageLogs = pgTable("image_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   shopId: varchar("shop_id").references(() => shops.id).notNull(),
   shopifyAssetId: text("shopify_asset_id").notNull(),
+  shopifyProductId: text("shopify_product_id"), // Product ID for API updates
   imageUrl: text("image_url").notNull(),
   imageName: text("image_name").notNull(),
   originalSize: integer("original_size").notNull(),
   optimizedSize: integer("optimized_size"),
+  optimizedUrl: text("optimized_url"), // URL of optimized image (Shopify Files)
   format: text("format").notNull(),
   status: imageStatusEnum("status").default("pending").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("pending"),
   originalS3Key: text("original_s3_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   optimizedAt: timestamp("optimized_at"),
+  syncedAt: timestamp("synced_at"),
 });
 
 export const insertShopSchema = createInsertSchema(shops).omit({

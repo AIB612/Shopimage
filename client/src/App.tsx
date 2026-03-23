@@ -5,11 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import Landing from "@/pages/landing";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Pricing from "@/pages/pricing";
-import Dashboard from "@/pages/dashboard";
-import Landing from "@/pages/landing";
 import FAQ from "@/pages/faq";
 
 function Router() {
@@ -20,7 +19,6 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/pricing" component={Pricing} />
-      <Route path="/dashboard" component={Dashboard} />
       <Route path="/faq" component={FAQ} />
       <Route component={NotFound} />
     </Switch>
