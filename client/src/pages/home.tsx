@@ -86,16 +86,27 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const shop = params.get("shop");
     
-    // If shop parameter exists, auto-scan (works for both OAuth callback and Shopify embedded app)
+    // If shop parameter exists, check if fresh install or returning user
     if (shop) {
       setAutoScanTriggered(true);
       setStoreUrl(shop);
       // Clean up URL
       window.history.replaceState({}, "", "/");
-      // Trigger scan after a short delay
-      setTimeout(() => {
-        scanMutation.mutate(shop);
-      }, 100);
+
+      const isNewInstall = params.get("installed") === "true" || params.has("hmac");
+      if (isNewInstall) {
+        // Fresh install — show ready state, let user initiate scan
+        setAppState("ready");
+        toast({
+          title: "Store Connected!",
+          description: "Your store is ready. Click Scan Store to analyze your images.",
+        });
+      } else {
+        // Returning user — auto-scan after short delay
+        setTimeout(() => {
+          scanMutation.mutate(shop);
+        }, 100);
+      }
     }
   }, [autoScanTriggered]);
 
@@ -171,6 +182,10 @@ export default function Home() {
       // Don't show error if redirecting to install
       if (error.message === "Redirecting to install...") {
         setScanStatus({ progress: 50, message: "Redirecting to Shopify..." });
+        // Reset to unauthorized after 6s if redirect has not happened
+        setTimeout(() => {
+          setAppState("unauthorized");
+        }, 6000);
         return;
       }
       setAppState("unauthorized");
@@ -345,6 +360,12 @@ export default function Home() {
           </div>
           <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Connecting to your store...</p>
           <p className="text-xs text-slate-400 mt-2">This may take a few seconds</p>
+          <button
+            className="mt-6 text-xs text-slate-400 underline hover:text-slate-600"
+            onClick={() => setAppState("unauthorized")}
+          >
+            Taking too long? Click here to continue
+          </button>
         </div>
       </div>
     );
