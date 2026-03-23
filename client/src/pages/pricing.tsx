@@ -8,9 +8,9 @@ import { useState } from "react";
 export default function Pricing() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
 
-  const monthlyPrice = 9.99;
-  const annualMonthlyPrice = 7.99;
-  const annualTotal = (annualMonthlyPrice * 12).toFixed(2);
+  const monthlyPrice = 9.90;
+  const annualMonthlyPrice = 8.33;
+  const annualTotal = "99.90";
 
   return (
     <PageLayout>
@@ -43,7 +43,7 @@ export default function Pricing() {
             >
               Annual
               <Badge variant="secondary" className="text-xs font-bold text-green-700 bg-green-100">
-                Save 20%
+                Save 16%
               </Badge>
             </button>
           </div>
