@@ -180,7 +180,12 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
     return { needsInstall: false, images: allImages };
   } catch (error) {
     console.error(`[Shopify] Fetch error for ${domain}:`, error);
-    return { needsInstall: false, images: [] };
+    return {
+      needsInstall: !!(!accessToken),
+      installUrl: !accessToken ? `/api/shopify/install?shop=${encodeURIComponent(domain)}` : undefined,
+      images: [],
+      error: error instanceof Error ? error.message : "Failed to connect to Shopify"
+    };
   }
 }
 
@@ -361,6 +366,15 @@ export async function registerRoutes(
       let shop = await storage.getShopByDomain(domain);
       if (!shop) {
         shop = await storage.createShop({ domain, lastScanAt: null });
+      }
+
+      // If the shop is not authorized yet, redirect to install just like Try Free
+      if (!shop.accessToken && !process.env.SHOPIFY_ACCESS_TOKEN) {
+        return res.status(401).json({
+          needsInstall: true,
+          installUrl: `/api/shopify/install?shop=${encodeURIComponent(domain)}`,
+          message: "Please install the app to access your store's images"
+        });
       }
 
       // Fetch Shopify images (will check if install is needed)

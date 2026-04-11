@@ -119,16 +119,16 @@ export default function Home() {
         credentials: "include",
       });
       
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       
-      // Check if needs install
+      // Redirect to install whenever backend indicates install is required
+      if (data?.needsInstall && data?.installUrl) {
+        window.location.href = data.installUrl;
+        throw new Error("Redirecting to install...");
+      }
+
       if (!response.ok) {
-        if (data.needsInstall && data.installUrl) {
-          // Redirect to Shopify install
-          window.location.href = data.installUrl;
-          throw new Error("Redirecting to install...");
-        }
-        throw new Error(data.message || "Failed to scan store");
+        throw new Error(data?.message || "Failed to scan store");
       }
       
       return data as ScanResult;
