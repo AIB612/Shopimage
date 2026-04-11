@@ -1,4 +1,8 @@
 import type { Shop, InsertShop, ImageLog, InsertImageLog } from "@shared/schema";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getShopByDomain(domain: string): Promise<Shop | undefined>;
@@ -16,7 +20,6 @@ export interface IStorage {
   deleteShop(id: string): Promise<void>;
 }
 
-// In-memory storage for demo mode
 class MemoryStorage implements IStorage {
   private shops: Map<string, Shop> = new Map();
   private imageLogs: Map<string, ImageLog> = new Map();
@@ -57,7 +60,10 @@ class MemoryStorage implements IStorage {
 
   async updateShopToken(id: string, accessToken: string, scope: string): Promise<void> {
     const shop = this.shops.get(id);
-    if (shop) { shop.accessToken = accessToken; shop.scope = scope; }
+    if (shop) {
+      shop.accessToken = accessToken;
+      shop.scope = scope;
+    }
   }
 
   async updateShopProStatus(id: string, isPro: boolean): Promise<void> {
@@ -101,8 +107,8 @@ class MemoryStorage implements IStorage {
     const log = this.imageLogs.get(id);
     if (!log) throw new Error("Image log not found");
     log.status = status;
-    if (status === "optimized" && optimizedSize) {
-      log.optimizedSize = optimizedSize;
+    if (status === "optimized" && optimizedSize !== undefined) {
+      log.optimizedSize = optimizedSize ?? null;
       log.optimizedAt = new Date();
     } else if (status === "pending") {
       log.optimizedSize = null;
@@ -136,76 +142,67 @@ class MemoryStorage implements IStorage {
   }
 }
 
-// Database storage for production (when DATABASE_URL is set)
 class DatabaseStorage implements IStorage {
-  private db: any;
-  private shops: any;
-  private imageLogs: any;
-  private eq: any;
+  private db: ReturnType<typeof drizzle>;
 
   constructor() {
-    // Lazy load database modules
-    const { drizzle } = require("drizzle-orm/node-postgres");
-    const pg = require("pg");
-    const schema = require("@shared/schema");
-    const { eq } = require("drizzle-orm");
-    
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-    pool.on('error', (err: Error) => console.error("[DATABASE] Pool Error:", err.message));
-    
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error("DATABASE_URL is not set");
+    }
+
+    const pool = new pg.Pool({ connectionString });
+    pool.on("error", (err: Error) => console.error("[DATABASE] Pool Error:", err.message));
     this.db = drizzle(pool, { schema });
-    this.shops = schema.shops;
-    this.imageLogs = schema.imageLogs;
-    this.eq = eq;
     console.log("[DATABASE] Connection pool created.");
   }
 
   async getShopByDomain(domain: string): Promise<Shop | undefined> {
-    const result = await this.db.select().from(this.shops).where(this.eq(this.shops.domain, domain)).limit(1);
+    const result = await this.db.select().from(schema.shops).where(eq(schema.shops.domain, domain)).limit(1);
     return result[0];
   }
 
   async getShopById(id: string): Promise<Shop | undefined> {
-    const result = await this.db.select().from(this.shops).where(this.eq(this.shops.id, id)).limit(1);
+    const result = await this.db.select().from(schema.shops).where(eq(schema.shops.id, id)).limit(1);
     return result[0];
   }
 
   async createShop(shop: InsertShop): Promise<Shop> {
-    const result = await this.db.insert(this.shops).values(shop).returning();
+    const result = await this.db.insert(schema.shops).values(shop).returning();
     return result[0];
   }
 
   async updateShopScanTime(id: string): Promise<void> {
-    await this.db.update(this.shops).set({ lastScanAt: new Date() }).where(this.eq(this.shops.id, id));
+    await this.db.update(schema.shops).set({ lastScanAt: new Date() }).where(eq(schema.shops.id, id));
   }
 
   async updateShopToken(id: string, accessToken: string, scope: string): Promise<void> {
-    await this.db.update(this.shops).set({ accessToken, scope }).where(this.eq(this.shops.id, id));
+    await this.db.update(schema.shops).set({ accessToken, scope }).where(eq(schema.shops.id, id));
   }
 
   async updateShopProStatus(id: string, isPro: boolean): Promise<void> {
-    await this.db.update(this.shops).set({ isPro: isPro ? 1 : 0 }).where(this.eq(this.shops.id, id));
+    await this.db.update(schema.shops).set({ isPro: isPro ? 1 : 0 }).where(eq(schema.shops.id, id));
   }
 
   async getImageLogsByShopId(shopId: string): Promise<ImageLog[]> {
-    return this.db.select().from(this.imageLogs).where(this.eq(this.imageLogs.shopId, shopId));
+    return this.db.select().from(schema.imageLogs).where(eq(schema.imageLogs.shopId, shopId));
   }
 
   async createImageLog(imageLog: InsertImageLog): Promise<ImageLog> {
-    const result = await this.db.insert(this.imageLogs).values(imageLog).returning();
+    const result = await this.db.insert(schema.imageLogs).values(imageLog).returning();
     return result[0];
   }
 
   async updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null): Promise<ImageLog> {
     const updateData: Partial<ImageLog> = { status };
-    if (status === "optimized" && optimizedSize) {
-      updateData.optimizedSize = optimizedSize;
+    if (status === "optimized" && optimizedSize !== undefined) {
+      updateData.optimizedSize = optimizedSize ?? null;
       updateData.optimizedAt = new Date();
     } else if (status === "pending") {
       updateData.optimizedSize = null;
       updateData.optimizedAt = null;
     }
-    const result = await this.db.update(this.imageLogs).set(updateData).where(this.eq(this.imageLogs.id, id)).returning();
+    const result = await this.db.update(schema.imageLogs).set(updateData).where(eq(schema.imageLogs.id, id)).returning();
     return result[0];
   }
 
@@ -214,33 +211,69 @@ class DatabaseStorage implements IStorage {
     if (syncStatus === "synced") {
       updateData.syncedAt = new Date();
     }
-    const result = await this.db.update(this.imageLogs).set(updateData).where(this.eq(this.imageLogs.id, id)).returning();
+    const result = await this.db.update(schema.imageLogs).set(updateData).where(eq(schema.imageLogs.id, id)).returning();
     return result[0];
   }
 
   async getImageLogById(id: string): Promise<ImageLog | undefined> {
-    const result = await this.db.select().from(this.imageLogs).where(this.eq(this.imageLogs.id, id)).limit(1);
+    const result = await this.db.select().from(schema.imageLogs).where(eq(schema.imageLogs.id, id)).limit(1);
     return result[0];
   }
 
   async deleteImageLogsByShopId(shopId: string): Promise<void> {
-    await this.db.delete(this.imageLogs).where(this.eq(this.imageLogs.shopId, shopId));
+    await this.db.delete(schema.imageLogs).where(eq(schema.imageLogs.shopId, shopId));
   }
 
   async deleteShop(id: string): Promise<void> {
-    await this.db.delete(this.shops).where(this.eq(this.shops.id, id));
+    await this.db.delete(schema.shops).where(eq(schema.shops.id, id));
   }
 }
 
-// Auto-select storage based on DATABASE_URL
-function createStorage(): IStorage {
-  if (process.env.DATABASE_URL) {
-    console.log("[STORAGE] DATABASE_URL found, using PostgreSQL");
-    return new DatabaseStorage();
-  } else {
-    console.log("[STORAGE] No DATABASE_URL, using in-memory storage (demo mode)");
-    return new MemoryStorage();
+class ResilientStorage implements IStorage {
+  private memory = new MemoryStorage();
+  private db?: DatabaseStorage;
+  private usingFallback = false;
+
+  constructor() {
+    if (process.env.DATABASE_URL) {
+      try {
+        this.db = new DatabaseStorage();
+      } catch (error) {
+        this.usingFallback = true;
+        console.error("[STORAGE] Failed to initialize PostgreSQL, falling back to memory:", error);
+      }
+    } else {
+      this.usingFallback = true;
+      console.log("[STORAGE] No DATABASE_URL, using in-memory storage (demo mode)");
+    }
   }
+
+  private async run<T>(operation: (storage: IStorage) => Promise<T>): Promise<T> {
+    if (this.db && !this.usingFallback) {
+      try {
+        return await operation(this.db);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[STORAGE] Database operation failed, falling back to memory:", message);
+        this.usingFallback = true;
+      }
+    }
+    return operation(this.memory);
+  }
+
+  getShopByDomain(domain: string) { return this.run(s => s.getShopByDomain(domain)); }
+  getShopById(id: string) { return this.run(s => s.getShopById(id)); }
+  createShop(shop: InsertShop) { return this.run(s => s.createShop(shop)); }
+  updateShopScanTime(id: string) { return this.run(s => s.updateShopScanTime(id)); }
+  updateShopToken(id: string, accessToken: string, scope: string) { return this.run(s => s.updateShopToken(id, accessToken, scope)); }
+  updateShopProStatus(id: string, isPro: boolean) { return this.run(s => s.updateShopProStatus(id, isPro)); }
+  getImageLogsByShopId(shopId: string) { return this.run(s => s.getImageLogsByShopId(shopId)); }
+  createImageLog(imageLog: InsertImageLog) { return this.run(s => s.createImageLog(imageLog)); }
+  updateImageLogStatus(id: string, status: "pending" | "optimized" | "reverted", optimizedSize?: number | null) { return this.run(s => s.updateImageLogStatus(id, status, optimizedSize)); }
+  updateImageLogSyncStatus(id: string, syncStatus: "synced" | "pending") { return this.run(s => s.updateImageLogSyncStatus(id, syncStatus)); }
+  getImageLogById(id: string) { return this.run(s => s.getImageLogById(id)); }
+  deleteImageLogsByShopId(shopId: string) { return this.run(s => s.deleteImageLogsByShopId(shopId)); }
+  deleteShop(id: string) { return this.run(s => s.deleteShop(id)); }
 }
 
-export const storage = createStorage();
+export const storage: IStorage = new ResilientStorage();

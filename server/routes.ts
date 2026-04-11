@@ -337,10 +337,14 @@ export async function registerRoutes(
   app.get("/api/shop/info", async (req, res) => {
     try {
       const shopDomain = "demo-store.myshopify.com";
-      const shop = await storage.getShopByDomain(shopDomain);
       let images: ImageLog[] = [];
-      if (shop) {
-        images = await storage.getImageLogsByShopId(shop.id);
+      try {
+        const shop = await storage.getShopByDomain(shopDomain);
+        if (shop) {
+          images = await storage.getImageLogsByShopId(shop.id);
+        }
+      } catch (storageError) {
+        console.error("[Shop Info] Storage error, returning safe demo response:", storageError);
       }
       return res.json({
         name: "Demo Store",
@@ -351,7 +355,15 @@ export async function registerRoutes(
         spaceSaved: 0,
       });
     } catch (error) {
-      return res.status(500).json({ message: "Failed to get shop info" });
+      console.error("[Shop Info] Error:", error);
+      return res.json({
+        name: "Demo Store",
+        domain: "demo-store.myshopify.com",
+        speedMetrics: { latency: 150 },
+        imagesOptimized: 0,
+        totalImages: 0,
+        spaceSaved: 0,
+      });
     }
   });
 
