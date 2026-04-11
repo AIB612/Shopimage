@@ -532,6 +532,7 @@ export default function Home() {
       case 'needs-improvement':
         return { color: 'bg-yellow-500', textColor: 'text-yellow-500', label: '🟡 Needs Improvement', desc: 'Fair' };
       case 'poor':
+      default:
         return { color: 'bg-red-500', textColor: 'text-red-500', label: '🔴 Poor', desc: 'Bad' };
     }
   };

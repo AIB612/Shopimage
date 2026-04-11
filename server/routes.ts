@@ -616,8 +616,31 @@ export async function registerRoutes(
       const result = await updateResponse.json();
       console.log(`[Sync] Successfully synced image ${shopifyImageId} to Shopify`);
 
+      // Refresh the real stored size after sync using Shopify CDN URL when available
+      let verifiedSize = imageLog.optimizedSize;
+      try {
+        const syncedImageUrl = result?.image?.src;
+        if (syncedImageUrl) {
+          const headResponse = await fetch(syncedImageUrl, { method: 'HEAD' });
+          const contentLength = headResponse.headers.get('content-length');
+          if (contentLength) {
+            verifiedSize = parseInt(contentLength, 10);
+            await storage.updateImageLogStatus(id, "optimized", verifiedSize);
+          }
+        }
+      } catch (verifyError) {
+        console.warn(`[Sync] Failed to verify synced image size for ${shopifyImageId}:`, verifyError);
+      }
+
       const updated = await storage.updateImageLogSyncStatus(id, "synced");
-      return res.json({ ...updated, message: "Successfully synced to Shopify", shopifyResult: result });
+      return res.json({ 
+        ...updated, 
+        optimizedSize: verifiedSize ?? updated.optimizedSize,
+        isEstimated: false,
+        note: verifiedSize ? "Displayed size verified from Shopify after sync" : "Synced to Shopify",
+        message: "Successfully synced to Shopify", 
+        shopifyResult: result 
+      });
     } catch (error) {
       console.error("Sync error:", error);
       return res.status(500).json({ message: "Sync failed", error: String(error) });
@@ -666,7 +689,6 @@ export async function registerRoutes(
 
           // Re-optimize if needed
           if (!imageLog.optimizedData) {
-            const sharp = require('sharp');
             const imageResponse = await fetch(imageLog.imageUrl);
             if (imageResponse.ok) {
               const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());

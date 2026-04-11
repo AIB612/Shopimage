@@ -57,6 +57,13 @@ export interface ScanResult {
   totalHeavyImages: number;
   potentialTimeSaved: number;
   grade: string;
+  webVitals?: {
+    lcp: number | null;
+    inp: number | null;
+    cls: number | null;
+    performanceScore: number;
+    status: "good" | "needs-improvement" | "poor";
+  };
 }
 
 export interface ImageAnalysis {
