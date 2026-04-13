@@ -87,14 +87,16 @@ async function fetchShopifyProducts(domain: string, shopAccessToken?: string | n
           images: []
         };
       }
-      
-      // 403: Usually means Protected Customer Data policy - app needs approval
+
+      // 403 can also mean the stored token is stale / app needs re-auth / missing approved scopes.
+      // Prefer guiding the merchant back through install instead of showing a generic scan failure.
       if (response.status === 403) {
-        console.log(`[Shopify] 403 Forbidden - may need Protected Customer Data approval in Shopify Partners`);
-        return { 
-          needsInstall: false, 
-          images: [], 
-          error: `Access denied. Please ensure the app has the required permissions in your Shopify Partners dashboard.` 
+        console.log(`[Shopify] 403 for ${domain} - treating as reauthorization required`);
+        return {
+          needsInstall: true,
+          installUrl: `/api/shopify/install?shop=${encodeURIComponent(domain)}`,
+          error: `Shopify access expired or requires reauthorization. Please reconnect your store.`,
+          images: []
         };
       }
       

@@ -120,15 +120,21 @@ export default function Home() {
       });
       
       const data = await response.json().catch(() => ({}));
+      const installUrl = `/api/shopify/install?shop=${encodeURIComponent(domain)}`;
+      const backendMessage = data?.message || data?.error || "";
+      const shouldForceInstall =
+        !!data?.needsInstall ||
+        response.status === 401 ||
+        /invalid api key|invalid access token|unrecognized login|wrong password|reauthorization|reconnect your store|access expired|install the app/i.test(backendMessage);
       
-      // Redirect to install whenever backend indicates install is required
-      if (data?.needsInstall && data?.installUrl) {
-        window.location.href = data.installUrl;
+      // Force redirect to install/reconnect whenever backend or Shopify indicates auth is required
+      if (shouldForceInstall) {
+        window.location.href = data?.installUrl || installUrl;
         throw new Error("Redirecting to install...");
       }
 
       if (!response.ok) {
-        throw new Error(data?.message || "Failed to scan store");
+        throw new Error(backendMessage || "Failed to scan store");
       }
       
       return data as ScanResult;
@@ -189,7 +195,14 @@ export default function Home() {
         return;
       }
       setAppState("unauthorized");
-      toast({ title: "Scan Failed", description: error.message, variant: "destructive" });
+      const isReconnectIssue = /reauthorization|reconnect your store|access expired|install the app/i.test(error.message);
+      toast({
+        title: isReconnectIssue ? "Reconnect Shopify Store" : "Scan Failed",
+        description: isReconnectIssue
+          ? "Your Shopify connection expired or is missing. Reconnect your store to continue scanning."
+          : error.message,
+        variant: "destructive"
+      });
     },
   });
 
