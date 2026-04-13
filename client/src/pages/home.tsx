@@ -112,13 +112,30 @@ export default function Home() {
 
   const scanMutation = useMutation({
     mutationFn: async (domain: string) => {
-      const response = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: domain }),
-        credentials: "include",
-      });
-      
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 15000);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: domain }),
+          credentials: "include",
+          signal: controller.signal,
+        });
+      } catch (error: any) {
+        window.clearTimeout(timeout);
+        const installUrl = `/api/shopify/install?shop=${encodeURIComponent(domain)}`;
+        // If scan request hangs or network fails, prefer sending merchant to install/reconnect.
+        if (error?.name === "AbortError" || /Failed to fetch|Load failed|NetworkError/i.test(String(error?.message || error))) {
+          window.location.href = installUrl;
+          throw new Error("Redirecting to install...");
+        }
+        throw error;
+      }
+
+      window.clearTimeout(timeout);
       const data = await response.json().catch(() => ({}));
       const installUrl = `/api/shopify/install?shop=${encodeURIComponent(domain)}`;
       const backendMessage = data?.message || data?.error || "";
