@@ -87,27 +87,19 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const shop = params.get("shop");
     
-    // If shop parameter exists, check if fresh install or returning user
+    // If shop parameter exists, continue directly into analysis flow
     if (shop) {
       setAutoScanTriggered(true);
       setStoreUrl(shop);
+      setAppState("scanning");
+      setScanStatus({ progress: 10, message: "Store connected. Starting analysis..." });
+      
       // Clean up URL
       window.history.replaceState({}, "", "/");
 
-      const isNewInstall = params.get("installed") === "true" || params.has("hmac");
-      if (isNewInstall) {
-        // Fresh install — show ready state, let user initiate scan
-        setAppState("ready");
-        toast({
-          title: "Store Connected!",
-          description: "Your store is ready. Click Scan Store to analyze your images.",
-        });
-      } else {
-        // Returning user — auto-scan after short delay
-        setTimeout(() => {
-          scanMutation.mutate(shop);
-        }, 100);
-      }
+      setTimeout(() => {
+        handleConnectStore(shop);
+      }, 150);
     }
   }, [autoScanTriggered]);
 
@@ -229,12 +221,14 @@ export default function Home() {
     return `${(bytes / 1024).toFixed(0)}KB`;
   };
 
-  const handleConnectStore = async () => {
-    if (!storeUrl.trim()) {
+  const handleConnectStore = async (domainOverride?: string) => {
+    const inputDomain = domainOverride || storeUrl;
+
+    if (!inputDomain.trim()) {
       toast({ title: "Enter URL", description: "Please enter your .myshopify.com store link.", variant: "destructive" });
       return;
     }
-    const cleanDomain = storeUrl.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
+    const cleanDomain = inputDomain.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0];
     
     // Validate it's a real Shopify domain
     if (!cleanDomain.includes(".myshopify.com")) {
@@ -464,11 +458,11 @@ export default function Home() {
                   placeholder="your-store.myshopify.com" 
                   value={storeUrl}
                   onChange={(e) => setStoreUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleConnectStore()}
+                  onKeyDown={(e) => e.key === "Enter" && void handleConnectStore()}
                   className="h-14 border-none bg-transparent text-lg font-bold px-8 focus-visible:ring-0 placeholder:text-slate-300"
                 />
                 <Button 
-                  onClick={handleConnectStore}
+                  onClick={() => void handleConnectStore()}
                   className="h-14 px-10 rounded-[2rem] font-black text-lg bg-black hover:bg-primary transition-all active:scale-95 shadow-xl shadow-black/20"
                 >
                   Analyze Now <ArrowRight className="ml-2 w-6 h-6" />
