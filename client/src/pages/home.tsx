@@ -403,9 +403,7 @@ export default function Home() {
           )}
           {appState === "unauthorized" && (
             <Button 
-              onClick={() => {
-                window.location.href = 'https://admin.shopify.com/oauth/install?client_id=8bb93335f801c72a4202bb83ceb58ff3';
-              }}
+              onClick={handleInstallApp}
               className="rounded-xl font-bold gap-2"
             >
               <Zap className="w-4 h-4" />
