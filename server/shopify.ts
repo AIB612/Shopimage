@@ -282,7 +282,7 @@ export async function handleCallback(req: Request, res: Response) {
     }
     
     const baseUrl = getBaseUrl();
-    res.redirect(`${baseUrl}/?shop=${encodeURIComponent(shop)}&installed=true`);
+    res.redirect(`${baseUrl}/?shop=${encodeURIComponent(shop)}&installed=true&autostart=scan`);
   } catch (error) {
     console.error("[Shopify OAuth] Callback error:", error);
     res.status(500).json({ error: "Failed to complete installation" });

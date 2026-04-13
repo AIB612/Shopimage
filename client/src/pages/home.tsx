@@ -87,20 +87,21 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const shop = params.get("shop");
     const isInstalled = params.get("installed") === "true" || params.has("hmac");
+    const shouldAutostartScan = params.get("autostart") === "scan" || isInstalled;
     
     // If shop parameter exists, continue directly into analysis flow
     if (shop) {
       setAutoScanTriggered(true);
       setStoreUrl(shop);
       setAppState("scanning");
-      setScanStatus({ progress: 10, message: isInstalled ? "Store connected. Loading scan results..." : "Reconnecting to your store..." });
+      setScanStatus({ progress: 10, message: shouldAutostartScan ? "Store connected. Loading scan results..." : "Reconnecting to your store..." });
       
       // Clean up URL
       window.history.replaceState({}, "", "/");
 
       setTimeout(() => {
         // After OAuth callback, skip the extra auth check and go straight into scan.
-        if (isInstalled) {
+        if (shouldAutostartScan) {
           scanMutation.mutate(shop);
         } else {
           handleConnectStore(shop);
