@@ -205,13 +205,13 @@ export default function Home() {
       // Don't show error if redirecting to install
       if (error.message === "Redirecting to install...") {
         setScanStatus({ progress: 50, message: "Redirecting to Shopify..." });
-        // Reset to unauthorized after 6s if redirect has not happened
+        // Reset to ready after 6s if redirect has not happened
         setTimeout(() => {
-          setAppState("unauthorized");
+          setAppState("ready");
         }, 6000);
         return;
       }
-      setAppState("unauthorized");
+      setAppState("ready");
       const isReconnectIssue = /reauthorization|reconnect your store|access expired|install the app/i.test(error.message);
       toast({
         title: isReconnectIssue ? "Reconnect Shopify Store" : "Scan Failed",
@@ -270,6 +270,7 @@ export default function Home() {
       }
 
       if (checkData?.needsInstall) {
+        setScanStatus({ progress: 85, message: checkData.statusMessage || "Redirecting to Shopify..." });
         window.location.href = checkData.installUrl || `/api/shopify/install?shop=${encodeURIComponent(cleanDomain)}`;
         return;
       }
