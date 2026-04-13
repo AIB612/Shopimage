@@ -962,7 +962,8 @@ export async function registerRoutes(
         tokenStatus: testResp.status === 401 ? "invalid" : "expired",
         needsInstall: true,
         installUrl,
-        statusMessage: "Authorization expired. Redirecting to Shopify..."
+        statusMessage: "Authorization expired. Redirecting to Shopify...",
+        reason: `shop-check-${testResp.status}`
       });
     } catch (error) {
       console.error("[Shop Check] Error:", error);

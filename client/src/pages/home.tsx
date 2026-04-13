@@ -270,8 +270,10 @@ export default function Home() {
       }
 
       if (checkData?.needsInstall) {
-        setScanStatus({ progress: 85, message: checkData.statusMessage || "Redirecting to Shopify..." });
-        window.location.href = checkData.installUrl || `/api/shopify/install?shop=${encodeURIComponent(cleanDomain)}`;
+        // Give the UI a beat to render the status before redirecting away.
+        setTimeout(() => {
+          window.location.href = checkData.installUrl || `/api/shopify/install?shop=${encodeURIComponent(cleanDomain)}`;
+        }, 400);
         return;
       }
 
