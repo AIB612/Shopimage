@@ -42,6 +42,7 @@ type AppState = "unauthorized" | "loading" | "ready" | "scanning" | "complete";
 interface ScanStatus {
   progress: number;
   message: string;
+  detail?: string;
 }
 
 const DEMO_IMAGES = [
@@ -266,7 +267,11 @@ export default function Home() {
       }
 
       if (checkData?.statusMessage) {
-        setScanStatus({ progress: checkData.authorized ? 35 : 50, message: checkData.statusMessage });
+        setScanStatus({
+          progress: checkData.authorized ? 35 : 50,
+          message: checkData.statusMessage,
+          detail: `shop=${cleanDomain} exists=${String(checkData?.exists)} authorized=${String(checkData?.authorized)} token=${checkData?.tokenStatus || 'unknown'} reason=${checkData?.reason || 'none'}`
+        });
       }
 
       if (checkData?.needsInstall) {
@@ -553,6 +558,11 @@ export default function Home() {
            </div>
            <h3 className="text-2xl font-black mb-2 uppercase tracking-tighter">{scanStatus.message}</h3>
            <p className="text-slate-400 font-medium">Brewing your performance report...</p>
+           {scanStatus.detail && (
+             <p className="mt-4 text-xs text-slate-500 break-words bg-slate-50 rounded-2xl px-4 py-3 border border-slate-200">
+               {scanStatus.detail}
+             </p>
+           )}
         </Card>
       </div>
     );
