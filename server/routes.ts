@@ -904,6 +904,81 @@ export async function registerRoutes(
     return `${shop}.myshopify.com`;
   }
   
+  // Check auth status for main app scan flow
+  app.post("/api/shop/check", async (req, res) => {
+    const rawDomain = req.body?.domain || req.body?.url;
+
+    if (!rawDomain || typeof rawDomain !== "string") {
+      return res.status(400).json({
+        ok: false,
+        message: "Missing shop domain"
+      });
+    }
+
+    const domain = normalizeShopDomain(rawDomain.replace(/^(https?:\/\/)?(www\.)?/, "").split("/")[0].toLowerCase());
+    const installUrl = `/api/shopify/install?shop=${encodeURIComponent(domain)}`;
+
+    try {
+      const shopData = await storage.getShopByDomain(domain);
+
+      if (!shopData || !shopData.accessToken) {
+        return res.json({
+          ok: true,
+          domain,
+          exists: !!shopData,
+          authorized: false,
+          tokenStatus: "missing",
+          needsInstall: true,
+          installUrl,
+          statusMessage: "Store not connected yet. Redirecting to Shopify authorization..."
+        });
+      }
+
+      const testUrl = `https://${domain}/admin/api/2024-01/shop.json`;
+      const testResp = await fetch(testUrl, {
+        headers: { "X-Shopify-Access-Token": shopData.accessToken }
+      });
+
+      if (testResp.ok) {
+        return res.json({
+          ok: true,
+          domain,
+          exists: true,
+          authorized: true,
+          tokenStatus: "valid",
+          needsInstall: false,
+          statusMessage: "Store connected. Starting analysis..."
+        });
+      }
+
+      const errorText = await testResp.text().catch(() => "");
+      console.log(`[Shop Check] ${domain} token invalid: ${testResp.status} ${errorText}`);
+
+      return res.json({
+        ok: true,
+        domain,
+        exists: true,
+        authorized: false,
+        tokenStatus: testResp.status === 401 ? "invalid" : "expired",
+        needsInstall: true,
+        installUrl,
+        statusMessage: "Authorization expired. Redirecting to Shopify..."
+      });
+    } catch (error) {
+      console.error("[Shop Check] Error:", error);
+      return res.json({
+        ok: true,
+        domain,
+        exists: false,
+        authorized: false,
+        tokenStatus: "unknown",
+        needsInstall: true,
+        installUrl,
+        statusMessage: "Could not verify store connection. Redirecting to Shopify..."
+      });
+    }
+  });
+
   // Check auth status for extension
   app.get("/api/extension/auth-status", async (req, res) => {
     const { platform, shop: rawShop } = req.query;

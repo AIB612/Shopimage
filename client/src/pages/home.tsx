@@ -228,7 +228,7 @@ export default function Home() {
     return `${(bytes / 1024).toFixed(0)}KB`;
   };
 
-  const handleConnectStore = () => {
+  const handleConnectStore = async () => {
     if (!storeUrl.trim()) {
       toast({ title: "Enter URL", description: "Please enter your .myshopify.com store link.", variant: "destructive" });
       return;
@@ -247,9 +247,43 @@ export default function Home() {
       toast({ title: "Invalid Store Name", description: "Store name must be at least 2 characters and contain only letters, numbers, or hyphens.", variant: "destructive" });
       return;
     }
-    
-    // Run scan with validated domain
-    scanMutation.mutate(cleanDomain);
+
+    try {
+      setAppState("scanning");
+      setScanStatus({ progress: 15, message: "Checking store connection..." });
+
+      const checkResp = await fetch("/api/shop/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: cleanDomain }),
+        credentials: "include",
+      });
+
+      const checkData = await checkResp.json().catch(() => ({}));
+
+      if (!checkResp.ok) {
+        throw new Error(checkData?.message || "Failed to verify store connection");
+      }
+
+      if (checkData?.statusMessage) {
+        setScanStatus({ progress: checkData.authorized ? 35 : 50, message: checkData.statusMessage });
+      }
+
+      if (checkData?.needsInstall) {
+        window.location.href = checkData.installUrl || `/api/shopify/install?shop=${encodeURIComponent(cleanDomain)}`;
+        return;
+      }
+
+      setScanStatus({ progress: 45, message: "Fetching product images..." });
+      scanMutation.mutate(cleanDomain);
+    } catch (error: any) {
+      setAppState("unauthorized");
+      toast({
+        title: "Connection Check Failed",
+        description: error?.message || "Could not verify your Shopify store.",
+        variant: "destructive"
+      });
+    }
   };
   
   // Function to start OAuth install flow
